@@ -3210,3 +3210,6 @@ PRODUCTION SCENARIO?
 ```
 
 If you can explain a concept at all seven levels, you are moving from **mid-level knowledge toward senior-level interview readiness**.
+
+
+Runtime polymorphism is the ability to use a parent class or interface reference to refer to different child/implementing objects, where the overridden method that gets executed is determined at runtime.
