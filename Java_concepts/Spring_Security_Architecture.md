@@ -1046,6 +1046,1632 @@ Think of the application as two gates:
 > **Tomcat gets the request to the Servlet; Spring Security can filter the request before MVC; DispatcherServlet receives the MVC request and uses HandlerMapping to delegate it to the correct controller method.**
 
 
+# Spring Security – Custom DB Authentication Flow
+
+## 1. Why Custom Authentication?
+
+In a real application, users are not usually hardcoded in Spring Security.
+
+Instead, user information is stored in a database:
+
+```text
+USER TABLE
+
+id    username    password       role
+1     kali        $2a$...        USER
+2     admin       $2b$...        ADMIN
+3     john        $2a$...        USER
+```
+
+Spring Security needs a way to:
+
+1. Receive the username and password.
+2. Find the user from the database.
+3. Convert the DB user into `UserDetails`.
+4. Verify the entered password.
+5. Create an authenticated `Authentication` object.
+
+For this, we commonly customize `UserDetailsService`.
+
+---
+
+# 2. Overall Custom DB Flow
+
+```text
+Login Request
+     |
+     v
+UsernamePasswordAuthenticationFilter
+     |
+     v
+AuthenticationManager
+     |
+     v
+AuthenticationProvider
+     |
+     v
+UserDetailsService
+     |
+     v
+UserRepository
+     |
+     v
+Database
+     |
+     v
+UserDetails
+     |
+     v
+PasswordEncoder
+     |
+     v
+Authentication SUCCESS
+```
+
+The important point is:
+
+```text
+AuthenticationManager
+        |
+        v
+AuthenticationProvider
+        |
+        v
+UserDetailsService
+        |
+        v
+Repository
+        |
+        v
+Database
+```
+
+---
+
+# 3. Entity / Database User
+
+Suppose our database contains:
+
+```java
+@Entity
+public class User {
+
+    @Id
+    private Long id;
+
+    private String username;
+
+    private String password;
+
+    private String role;
+
+    // getters and setters
+}
+```
+
+Example database:
+
+```text
++----+----------+----------+-------+
+| id | username | password | role  |
++----+----------+----------+-------+
+| 1  | kali     | $2a$...  | USER  |
+| 2  | admin    | $2a$...  | ADMIN |
+| 3  | john     | $2a$...  | USER  |
++----+----------+----------+-------+
+```
+
+Passwords should normally be stored as encoded passwords, not plain text.
+
+---
+
+# 4. Repository
+
+The repository is responsible for communicating with the database.
+
+```java
+public interface UserRepository
+        extends JpaRepository<User, Long> {
+
+    Optional<User> findByUsername(String username);
+}
+```
+
+Now we can search:
+
+```java
+userRepository.findByUsername("kali");
+```
+
+This returns:
+
+```text
+Database
+    |
+    v
+User object
+```
+
+---
+
+# 5. CustomUserDetails
+
+Spring Security does not directly work with our application's `User` entity.
+
+It expects a `UserDetails` object.
+
+Therefore, we can create our own implementation:
+
+```java
+public class CustomUserDetails implements UserDetails {
+
+    private final User user;
+
+    public CustomUserDetails(User user) {
+        this.user = user;
+    }
+
+    @Override
+    public String getUsername() {
+        return user.getUsername();
+    }
+
+    @Override
+    public String getPassword() {
+        return user.getPassword();
+    }
+
+    @Override
+    public Collection<? extends GrantedAuthority> getAuthorities() {
+
+        return List.of(
+            new SimpleGrantedAuthority("ROLE_" + user.getRole())
+        );
+    }
+
+    @Override
+    public boolean isAccountNonExpired() {
+        return true;
+    }
+
+    @Override
+    public boolean isAccountNonLocked() {
+        return true;
+    }
+
+    @Override
+    public boolean isCredentialsNonExpired() {
+        return true;
+    }
+
+    @Override
+    public boolean isEnabled() {
+        return true;
+    }
+}
+```
+
+The important conversion is:
+
+```text
+Database User
+     |
+     v
+CustomUserDetails
+     |
+     v
+Spring Security
+```
+
+---
+
+# 6. CustomUserDetailsService
+
+Now we create our custom `UserDetailsService`.
+
+```java
+@Service
+public class CustomUserDetailsService
+        implements UserDetailsService {
+
+    private final UserRepository userRepository;
+
+    public CustomUserDetailsService(
+            UserRepository userRepository) {
+        this.userRepository = userRepository;
+    }
+
+    @Override
+    public UserDetails loadUserByUsername(String username)
+            throws UsernameNotFoundException {
+
+        User user = userRepository
+                .findByUsername(username)
+                .orElseThrow(() ->
+                    new UsernameNotFoundException(
+                        "User not found"));
+
+        return new CustomUserDetails(user);
+    }
+}
+```
+
+## Responsibility
+
+`CustomUserDetailsService` has one main responsibility:
+
+> Find the user and return the user as `UserDetails`.
+
+It does NOT normally verify the password itself.
+
+For example:
+
+```text
+loadUserByUsername("kali")
+            |
+            v
+       Repository
+            |
+            v
+        Database
+            |
+            v
+       User object
+            |
+            v
+   CustomUserDetails
+```
+
+---
+
+# 7. AuthenticationProvider
+
+For database username/password authentication, Spring Security commonly uses:
+
+```java
+DaoAuthenticationProvider
+```
+
+We configure it with our custom `UserDetailsService` and `PasswordEncoder`.
+
+```java
+@Bean
+public AuthenticationProvider authenticationProvider(
+        UserDetailsService userDetailsService,
+        PasswordEncoder passwordEncoder) {
+
+    DaoAuthenticationProvider provider =
+            new DaoAuthenticationProvider();
+
+    provider.setUserDetailsService(userDetailsService);
+    provider.setPasswordEncoder(passwordEncoder);
+
+    return provider;
+}
+```
+
+The relationship is:
+
+```text
+DaoAuthenticationProvider
+        |
+        +------ UserDetailsService
+        |
+        +------ PasswordEncoder
+```
+
+---
+
+# 8. PasswordEncoder
+
+Example:
+
+```java
+@Bean
+public PasswordEncoder passwordEncoder() {
+    return new BCryptPasswordEncoder();
+}
+```
+
+Suppose the user enters:
+
+```text
+password = "kali123"
+```
+
+Database contains:
+
+```text
+$2a$10$xxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+The `PasswordEncoder` compares them.
+
+Conceptually:
+
+```text
+Entered Password
+       |
+       v
+PasswordEncoder
+       |
+       v
+Compare with DB encoded password
+       |
+       +---- Match ----> SUCCESS
+       |
+       +---- No Match -> FAILURE
+```
+
+---
+
+# 9. AuthenticationManager
+
+`AuthenticationManager` coordinates authentication.
+
+Conceptually:
+
+```text
+AuthenticationManager
+        |
+        v
+AuthenticationProvider
+```
+
+The `AuthenticationManager` receives an authentication request and delegates it to the appropriate `AuthenticationProvider`.
+
+For username/password authentication:
+
+```text
+AuthenticationManager
+        |
+        v
+DaoAuthenticationProvider
+```
+
+Then:
+
+```text
+DaoAuthenticationProvider
+        |
+        v
+CustomUserDetailsService
+        |
+        v
+Database
+```
+
+---
+
+# 10. Complete Configuration
+
+A typical configuration can look like:
+
+```java
+@Configuration
+@EnableWebSecurity
+public class SecurityConfig {
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+
+    @Bean
+    public AuthenticationProvider authenticationProvider(
+            UserDetailsService userDetailsService,
+            PasswordEncoder passwordEncoder) {
+
+        DaoAuthenticationProvider provider =
+                new DaoAuthenticationProvider();
+
+        provider.setUserDetailsService(userDetailsService);
+        provider.setPasswordEncoder(passwordEncoder);
+
+        return provider;
+    }
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(
+            HttpSecurity http) throws Exception {
+
+        return http
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/login").permitAll()
+                        .anyRequest().authenticated()
+                )
+                .formLogin()
+                .and()
+                .build();
+    }
+}
+```
+
+---
+
+# 11. Multiple Users
+
+A very important point:
+
+We do NOT create a separate `UserDetailsService` for every user.
+
+We create only one:
+
+```text
+CustomUserDetailsService
+```
+
+It handles all users.
+
+For example:
+
+```text
+Database
+
+kali
+admin
+john
+```
+
+When Kali logs in:
+
+```text
+username = kali
+       |
+       v
+CustomUserDetailsService
+       |
+       v
+findByUsername("kali")
+       |
+       v
+Kali User
+```
+
+When Admin logs in:
+
+```text
+username = admin
+       |
+       v
+CustomUserDetailsService
+       |
+       v
+findByUsername("admin")
+       |
+       v
+Admin User
+```
+
+When John logs in:
+
+```text
+username = john
+       |
+       v
+CustomUserDetailsService
+       |
+       v
+findByUsername("john")
+       |
+       v
+John User
+```
+
+So the same service handles every user.
+
+---
+
+# 12. Complete Example – Kali Login
+
+Suppose the database contains:
+
+```text
+username = kali
+password = encodedPassword
+role     = USER
+```
+
+Kali sends:
+
+```text
+username = kali
+password = kali123
+```
+
+The flow is:
+
+```text
+1. Login Request
+       |
+       v
+2. UsernamePasswordAuthenticationFilter
+       |
+       v
+3. AuthenticationManager
+       |
+       v
+4. DaoAuthenticationProvider
+       |
+       v
+5. CustomUserDetailsService
+       |
+       v
+6. UserRepository
+       |
+       v
+7. Database
+       |
+       v
+8. User found
+       |
+       v
+9. CustomUserDetails
+       |
+       v
+10. PasswordEncoder
+       |
+       v
+11. Password matches
+       |
+       v
+12. Authentication SUCCESS
+```
+
+---
+
+# 13. What if User Does Not Exist?
+
+Suppose:
+
+```text
+username = xyz
+```
+
+But the database does not contain `xyz`.
+
+Then:
+
+```text
+CustomUserDetailsService
+        |
+        v
+UserRepository
+        |
+        v
+Database
+        |
+        v
+User NOT FOUND
+        |
+        v
+UsernameNotFoundException
+        |
+        v
+Authentication FAILURE
+```
+
+---
+
+# 14. What if Password Is Wrong?
+
+Suppose:
+
+```text
+Username = kali
+Password = wrongPassword
+```
+
+The user is found:
+
+```text
+Database
+   |
+   v
+Kali User
+```
+
+Then the password is checked:
+
+```text
+Entered Password
+       |
+       v
+PasswordEncoder
+       |
+       X
+DB Password
+```
+
+If they don't match:
+
+```text
+Authentication Failure
+```
+
+---
+
+# 15. What Each Component Does
+
+| Component                   | Main Responsibility                                            |
+| --------------------------- | -------------------------------------------------------------- |
+| `AuthenticationManager`     | Coordinates authentication                                     |
+| `AuthenticationProvider`    | Performs a particular authentication mechanism                 |
+| `DaoAuthenticationProvider` | Username/password authentication using `UserDetailsService`    |
+| `UserDetailsService`        | Loads user information                                         |
+| `UserRepository`            | Retrieves user from database                                   |
+| `Database`                  | Stores users                                                   |
+| `CustomUserDetails`         | Converts application User into Spring Security's `UserDetails` |
+| `PasswordEncoder`           | Verifies encoded password                                      |
+| `UserDetails`               | Provides user information required by Spring Security          |
+
+---
+
+# 16. Most Important Interview Explanation
+
+If asked:
+
+**"How do you integrate Spring Security authentication with a database?"**
+
+Answer:
+
+```text
+I implement UserDetailsService to load the user
+from the database using UserRepository.
+
+The User entity is converted into a UserDetails
+object, usually through a custom UserDetails implementation.
+
+I configure DaoAuthenticationProvider with my
+CustomUserDetailsService and PasswordEncoder.
+
+AuthenticationManager delegates the authentication
+request to the AuthenticationProvider.
+
+The provider loads the user through UserDetailsService
+and verifies the submitted password using PasswordEncoder.
+
+If the credentials are valid, authentication succeeds.
+```
+
+---
+
+# 17. One-Line Mental Model
+
+Remember this:
+
+```text
+AuthenticationManager
+        ↓
+AuthenticationProvider
+        ↓
+UserDetailsService
+        ↓
+Repository
+        ↓
+Database
+```
+
+And:
+
+```text
+UserDetailsService
+      = "Find the user"
+
+AuthenticationProvider
+      = "Authenticate the user"
+
+AuthenticationManager
+      = "Coordinate the authentication"
+```
+
+## Final Flow
+
+```text
+                  LOGIN
+                    |
+                    v
+     UsernamePasswordAuthenticationFilter
+                    |
+                    v
+          AuthenticationManager
+                    |
+                    v
+       DaoAuthenticationProvider
+              /             \
+             v               v
+ UserDetailsService    PasswordEncoder
+             |
+             v
+       UserRepository
+             |
+             v
+          Database
+             |
+             v
+          User
+             |
+             v
+     CustomUserDetails
+             |
+             v
+       Password Check
+             |
+       +-----+-----+
+       |           |
+     Match       No Match
+       |           |
+       v           v
+   SUCCESS       FAILURE
+```
+
+**Key point:** For multiple users, there is still only **one `CustomUserDetailsService` and one `AuthenticationProvider`**. The username from the login request determines which database record is loaded.
+
+# Spring Security – JWT Filter Login & Subsequent Request Flow
+
+## 1. Big Picture
+
+In JWT-based authentication, there are **two different flows**:
+
+```text
+1. LOGIN FLOW
+   Username + Password
+        ↓
+   AuthenticationManager
+        ↓
+   AuthenticationProvider
+        ↓
+   UserDetailsService
+        ↓
+   Database
+        ↓
+   PasswordEncoder
+        ↓
+   Generate JWT
+
+
+2. SUBSEQUENT REQUEST FLOW
+   JWT
+        ↓
+   JWT Filter
+        ↓
+   Validate JWT
+        ↓
+   Create Authentication
+        ↓
+   SecurityContext
+        ↓
+   Authorization
+        ↓
+   Controller
+```
+
+The important difference is:
+
+> `AuthenticationManager` is normally used during **login**, but it is **not required for validating an already-issued JWT**.
+
+---
+
+# 2. Login Flow
+
+Suppose the client sends:
+
+```http
+POST /login
+
+{
+    "username": "kali",
+    "password": "kali123"
+}
+```
+
+We have a custom login method:
+
+```java
+public String verify(Users user) {
+
+    Authentication authentication =
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(
+                            user.getUsername(),
+                            user.getPassword()
+                    )
+            );
+
+    if (authentication.isAuthenticated()) {
+        return jwtService.generateToken(user.getUsername());
+    }
+
+    return "Login failed";
+}
+```
+
+The flow is:
+
+```text
+Client
+  |
+  | username + password
+  v
+/login
+  |
+  v
+verify()
+  |
+  v
+UsernamePasswordAuthenticationToken
+  |
+  v
+AuthenticationManager
+  |
+  v
+AuthenticationProvider
+  |
+  v
+DaoAuthenticationProvider
+  |
+  v
+CustomUserDetailsService
+  |
+  v
+UserRepository
+  |
+  v
+Database
+  |
+  v
+UserDetails
+  |
+  v
+PasswordEncoder
+  |
+  v
+Authentication SUCCESS
+  |
+  v
+jwtService.generateToken()
+  |
+  v
+JWT returned to client
+```
+
+---
+
+# 3. Why UsernamePasswordAuthenticationToken?
+
+In the login code:
+
+```java
+new UsernamePasswordAuthenticationToken(
+        user.getUsername(),
+        user.getPassword()
+)
+```
+
+This object represents the authentication request.
+
+Conceptually:
+
+```text
+UsernamePasswordAuthenticationToken
+
+username = kali
+password = kali123
+```
+
+It does **not** authenticate the user by itself.
+
+It simply carries the credentials to:
+
+```java
+authenticationManager.authenticate(...)
+```
+
+Then the `AuthenticationManager` delegates the request to an appropriate `AuthenticationProvider`.
+
+---
+
+# 4. AuthenticationManager → AuthenticationProvider
+
+When we write:
+
+```java
+authenticationManager.authenticate(token);
+```
+
+the flow is:
+
+```text
+AuthenticationManager
+        |
+        v
+AuthenticationProvider
+        |
+        v
+DaoAuthenticationProvider
+```
+
+The provider was configured earlier in `SecurityConfig`.
+
+Example:
+
+```java
+@Bean
+public AuthenticationProvider authenticationProvider(
+        UserDetailsService userDetailsService,
+        PasswordEncoder passwordEncoder) {
+
+    DaoAuthenticationProvider provider =
+            new DaoAuthenticationProvider();
+
+    provider.setUserDetailsService(userDetailsService);
+    provider.setPasswordEncoder(passwordEncoder);
+
+    return provider;
+}
+```
+
+Important:
+
+> `SecurityConfig` creates/configures the provider during application startup. It is not opened again during every login request.
+
+Runtime:
+
+```text
+authenticationManager.authenticate()
+              |
+              v
+     configured Provider
+              |
+              v
+     DaoAuthenticationProvider
+```
+
+---
+
+# 5. Provider → UserDetailsService → Database
+
+`DaoAuthenticationProvider` needs user information.
+
+Therefore it calls:
+
+```java
+userDetailsService.loadUserByUsername(username);
+```
+
+Our custom implementation:
+
+```java
+@Service
+public class CustomUserDetailsService
+        implements UserDetailsService {
+
+    private final UserRepository userRepository;
+
+    @Override
+    public UserDetails loadUserByUsername(String username)
+            throws UsernameNotFoundException {
+
+        User user = userRepository
+                .findByUsername(username)
+                .orElseThrow(() ->
+                    new UsernameNotFoundException(
+                        "User not found"));
+
+        return new CustomUserDetails(user);
+    }
+}
+```
+
+Flow:
+
+```text
+DaoAuthenticationProvider
+          |
+          v
+CustomUserDetailsService
+          |
+          v
+UserRepository
+          |
+          v
+Database
+          |
+          v
+User
+          |
+          v
+CustomUserDetails
+```
+
+---
+
+# 6. Password Validation
+
+After loading the user, the provider verifies the password using:
+
+```java
+PasswordEncoder
+```
+
+Conceptually:
+
+```text
+Entered Password
+      |
+      v
+PasswordEncoder
+      |
+      | compare
+      v
+Encoded Password from DB
+```
+
+If the passwords match:
+
+```text
+Authentication SUCCESS
+```
+
+If they don't:
+
+```text
+Authentication FAILURE
+```
+
+---
+
+# 7. Generate JWT
+
+After successful authentication:
+
+```java
+if (authentication.isAuthenticated()) {
+    return jwtService.generateToken(user.getUsername());
+}
+```
+
+Now the application generates a JWT.
+
+```text
+Username + Password
+        |
+        v
+Authentication SUCCESS
+        |
+        v
+Generate JWT
+        |
+        v
+Return JWT to Client
+```
+
+Example response:
+
+```text
+eyJhbGciOiJIUzI1NiJ9...
+```
+
+The client stores the token and sends it with subsequent requests.
+
+---
+
+# 8. Subsequent Request
+
+Now suppose the user wants:
+
+```http
+GET /products
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9...
+```
+
+The user does **not** send the username and password again.
+
+Instead:
+
+```text
+Client
+   |
+   | Bearer JWT
+   v
+Server
+```
+
+---
+
+# 9. JWT Filter
+
+A custom JWT filter is usually placed in the Spring Security filter chain.
+
+Conceptually:
+
+```text
+HTTP Request
+     |
+     v
+JWT Filter
+     |
+     v
+Extract Authorization Header
+     |
+     v
+Extract JWT
+     |
+     v
+Validate JWT
+```
+
+Example:
+
+```java
+@Component
+public class JwtFilter extends OncePerRequestFilter {
+
+    private final JwtService jwtService;
+
+    @Override
+    protected void doFilterInternal(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            FilterChain filterChain)
+            throws ServletException, IOException {
+
+        String authHeader =
+                request.getHeader("Authorization");
+
+        if (authHeader != null &&
+            authHeader.startsWith("Bearer ")) {
+
+            String token =
+                    authHeader.substring(7);
+
+            String username =
+                    jwtService.extractUsername(token);
+
+            if (username != null &&
+                jwtService.validateToken(token)) {
+
+                UserDetails userDetails = ...;
+
+                UsernamePasswordAuthenticationToken authentication =
+                        new UsernamePasswordAuthenticationToken(
+                                userDetails,
+                                null,
+                                userDetails.getAuthorities()
+                        );
+
+                SecurityContextHolder
+                        .getContext()
+                        .setAuthentication(authentication);
+            }
+        }
+
+        filterChain.doFilter(request, response);
+    }
+}
+```
+
+---
+
+# 10. Important: AuthenticationManager Is NOT Required Here
+
+This is the key concept.
+
+During login:
+
+```text
+Username + Password
+       ↓
+AuthenticationManager
+       ↓
+AuthenticationProvider
+       ↓
+Database
+```
+
+But during a subsequent JWT request:
+
+```text
+JWT
+ ↓
+JWT Filter
+ ↓
+JWT Validation
+ ↓
+Authentication object
+ ↓
+SecurityContext
+```
+
+You normally do **not** do:
+
+```java
+authenticationManager.authenticate(...)
+```
+
+inside the JWT filter just to validate the JWT.
+
+Why?
+
+Because the user has already authenticated during login.
+
+The JWT is now being used as the user's credential/token.
+
+---
+
+# 11. JWT Validation
+
+The JWT filter extracts the token:
+
+```java
+String token =
+        authHeader.substring(7);
+```
+
+Then the JWT service validates it.
+
+Conceptually:
+
+```text
+JWT
+ |
+ +---- Signature valid?
+ |
+ +---- Token expired?
+ |
+ +---- Claims valid?
+ |
+ +---- Username extracted?
+ |
+ v
+VALID
+```
+
+If valid:
+
+```text
+JWT Valid
+   |
+   v
+Create Authentication
+```
+
+---
+
+# 12. Creating Authentication in JWT Filter
+
+This is an important difference from login.
+
+During login, we create:
+
+```java
+new UsernamePasswordAuthenticationToken(
+    username,
+    password
+)
+```
+
+This represents:
+
+> "Please authenticate these credentials."
+
+During JWT validation, we create:
+
+```java
+new UsernamePasswordAuthenticationToken(
+    userDetails,
+    null,
+    userDetails.getAuthorities()
+)
+```
+
+This represents:
+
+> "This user has already been authenticated using the valid JWT."
+
+So:
+
+```text
+LOGIN
+
+UsernamePasswordAuthenticationToken
+(username, password)
+        ↓
+AuthenticationManager
+```
+
+Whereas:
+
+```text
+SUBSEQUENT REQUEST
+
+UsernamePasswordAuthenticationToken
+(userDetails, null, authorities)
+        ↓
+SecurityContext
+```
+
+The same class can be used for different stages, but the meaning/state is different.
+
+---
+
+# 13. SecurityContext
+
+After validating the JWT, the filter sets the authentication:
+
+```java
+SecurityContextHolder
+        .getContext()
+        .setAuthentication(authentication);
+```
+
+Now Spring Security knows:
+
+```text
+Current User = kali
+Authorities  = ROLE_USER
+Authenticated = true
+```
+
+Conceptually:
+
+```text
+JWT
+ ↓
+JWT Filter
+ ↓
+Validate
+ ↓
+Authentication Object
+ ↓
+SecurityContext
+```
+
+---
+
+# 14. Continue the Filter Chain
+
+Finally:
+
+```java
+filterChain.doFilter(request, response);
+```
+
+This allows the request to continue through the remaining filters.
+
+Eventually it can reach the controller.
+
+```text
+JWT Filter
+    |
+    v
+SecurityContext
+    |
+    v
+Authorization
+    |
+    v
+Controller
+```
+
+---
+
+# 15. Complete JWT Login + Subsequent Flow
+
+## First Request – Login
+
+```text
+             LOGIN
+               |
+               v
+      Username + Password
+               |
+               v
+            verify()
+               |
+               v
+UsernamePasswordAuthenticationToken
+               |
+               v
+    AuthenticationManager
+               |
+               v
+    AuthenticationProvider
+               |
+               v
+    DaoAuthenticationProvider
+               |
+               v
+    CustomUserDetailsService
+               |
+               v
+        UserRepository
+               |
+               v
+           Database
+               |
+               v
+          UserDetails
+               |
+               v
+        PasswordEncoder
+               |
+               v
+       Authentication
+          SUCCESS
+               |
+               v
+      Generate JWT
+               |
+               v
+        Return JWT
+```
+
+---
+
+# 16. Second Request – JWT
+
+```text
+           GET /products
+                 |
+                 |
+        Authorization: Bearer JWT
+                 |
+                 v
+             JWT Filter
+                 |
+                 v
+          Extract JWT
+                 |
+                 v
+        Validate JWT
+                 |
+                 v
+        Extract Username
+                 |
+                 v
+      Create Authentication
+                 |
+                 v
+         SecurityContext
+                 |
+                 v
+           Authorization
+                 |
+                 v
+            Controller
+```
+
+---
+
+# 17. Does JWT Filter Need UserDetailsService?
+
+This depends on the implementation.
+
+A common implementation does:
+
+```text
+JWT
+ ↓
+Extract username
+ ↓
+UserDetailsService
+ ↓
+Load user
+ ↓
+Create Authentication
+ ↓
+SecurityContext
+```
+
+So:
+
+```text
+JWT Filter
+    |
+    v
+JwtService
+    |
+    v
+extractUsername()
+    |
+    v
+CustomUserDetailsService
+    |
+    v
+Database
+```
+
+However, the JWT itself can contain claims such as username and authorities, and an application can choose to construct the authenticated principal from trusted validated claims instead.
+
+Therefore:
+
+> `UserDetailsService` may be used during JWT requests, but `AuthenticationManager` does not have to be.
+
+---
+
+# 18. Login vs Subsequent Request
+
+|                         | Login                                   | Subsequent Request                    |
+| ----------------------- | --------------------------------------- | ------------------------------------- |
+| Credential              | Username + Password                     | JWT                                   |
+| Custom login controller | Usually yes                             | No                                    |
+| JWT Filter              | Not necessarily responsible for login   | Yes                                   |
+| AuthenticationManager   | Yes                                     | Usually no                            |
+| AuthenticationProvider  | Yes                                     | Usually no                            |
+| UserDetailsService      | Yes                                     | Optional, depending on implementation |
+| PasswordEncoder         | Yes                                     | No                                    |
+| JWT validation          | Generate JWT                            | Validate JWT                          |
+| SecurityContext         | Created after successful authentication | Populated by JWT filter               |
+| Database                | Usually queried                         | Optional, depending on implementation |
+
+---
+
+# 19. Most Important Mental Model
+
+Remember these two flows separately.
+
+### Login
+
+```text
+USERNAME + PASSWORD
+        ↓
+AuthenticationManager
+        ↓
+AuthenticationProvider
+        ↓
+UserDetailsService
+        ↓
+Database
+        ↓
+PasswordEncoder
+        ↓
+SUCCESS
+        ↓
+JWT
+```
+
+### Subsequent Request
+
+```text
+JWT
+ ↓
+JWT Filter
+ ↓
+Validate JWT
+ ↓
+Create Authentication
+ ↓
+SecurityContext
+ ↓
+Authorization
+ ↓
+Controller
+```
+
+## Final Key Point
+
+> **AuthenticationManager is used to authenticate the username/password during login.**
+
+> **JWT Filter validates the already-issued JWT for subsequent requests and establishes the Authentication in the SecurityContext.**
+
+Therefore:
+
+```text
+LOGIN
+AuthenticationManager → AuthenticationProvider
+```
+
+but:
+
+```text
+SUBSEQUENT REQUEST
+JWT Filter → JWT Validation → SecurityContext
+```
+
+The JWT filter does **not normally need to call `AuthenticationManager` just to validate the token**.
+
+
 # Authorization Architecture — Spring Security
 
 ## 1. What is Authorization?
@@ -1098,3 +2724,158 @@ DispatcherServlet     Exception handling
    |                      |
    v                      v
 Controller             403 Forbidden
+
+
+
+# Spring Security Method Security
+
+## Enable Method Security
+
+To use method-level authorization:
+
+```java
+@Configuration
+@EnableWebSecurity
+@EnableMethodSecurity
+public class SecurityConfig {
+}
+```
+
+`@EnableMethodSecurity` enables:
+
+* `@PreAuthorize`
+* `@PostAuthorize`
+* `@PreFilter`
+* `@PostFilter`
+
+---
+
+## 1. @PreAuthorize
+
+Checks authorization **before the method executes**.
+
+```java
+@GetMapping("/")
+@PreAuthorize("hasAuthority('USER_READ')")
+public List<Student> getStudents() {
+    return studentService.getStudents();
+}
+```
+
+Flow:
+
+```text
+Request
+   ↓
+@PreAuthorize
+   ↓
+Allowed?
+   ↓ YES
+Method executes
+```
+
+If not allowed → `403 Forbidden`.
+
+---
+
+## 2. @PostAuthorize
+
+Checks authorization **after the method executes**.
+
+Useful when authorization depends on the **returned object**.
+
+```java
+@GetMapping("/{id}")
+@PostAuthorize("returnObject.username == authentication.name")
+public Student getStudent(@PathVariable int id) {
+    return studentService.getStudent(id);
+}
+```
+
+Flow:
+
+```text
+Request
+   ↓
+Method executes
+   ↓
+Object returned
+   ↓
+@PostAuthorize
+   ↓
+Allow / 403
+```
+
+`returnObject` = object returned by the method.
+
+---
+
+## 3. @PreFilter
+
+Filters a **collection input before the method executes**.
+
+```java
+@PreFilter("filterObject.username == authentication.name")
+public void processStudents(List<Student> students) {
+    // Only allowed students reach this method
+}
+```
+
+```text
+Input List
+   ↓
+@PreFilter
+   ↓
+Filtered List
+   ↓
+Method
+```
+
+---
+
+## 4. @PostFilter
+
+Filters a **collection returned by the method**.
+
+```java
+@GetMapping("/")
+@PostFilter("filterObject.username == authentication.name")
+public List<Student> getStudents() {
+    return studentService.getStudents();
+}
+```
+
+```text
+Method
+   ↓
+Full List
+   ↓
+@PostFilter
+   ↓
+Filtered List
+   ↓
+Response
+```
+
+`filterObject` = current object being checked in the collection.
+
+---
+
+## Quick Difference
+
+| Annotation       | When          | Purpose                    |
+| ---------------- | ------------- | -------------------------- |
+| `@PreAuthorize`  | Before method | Allow/Deny method          |
+| `@PostAuthorize` | After method  | Allow/Deny returned object |
+| `@PreFilter`     | Before method | Filter input collection    |
+| `@PostFilter`    | After method  | Filter returned collection |
+
+### Easy Memory Trick
+
+```text
+PRE  → Before method
+POST → After method
+
+AUTHORIZE → Allow / Deny
+FILTER    → Remove objects
+```
