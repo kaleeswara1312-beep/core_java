@@ -597,3 +597,342 @@ This gives the application **backpressure** instead of allowing unlimited work t
 ## Interviewer-Impressing Summary
 
 > **"I don't choose a thread pool only based on the number of requests. I look at the workload — CPU-bound vs I/O-bound, task duration, traffic burst, queue capacity and downstream resource limits. For predictable workloads I can use a fixed pool; for short-lived bursty tasks a cached pool may work, but for production systems I generally prefer a bounded `ThreadPoolExecutor` so I can control concurrency, queueing and rejection."**
+
+
+# Java: synchronized, volatile and Atomic Classes
+
+These three are used when multiple threads are working with the same data.
+
+They solve different problems:
+
+* `synchronized` → only one thread can execute the critical section at a time
+* `volatile` → makes sure other threads see the latest value
+* Atomic classes → make certain operations on a shared variable atomic and thread-safe
+
+---
+
+# 1. synchronized
+
+## What is synchronized?
+
+`synchronized` is used when multiple threads are accessing the same data and we want only **one thread at a time** to execute a particular method or block of code.
+
+It gives us:
+
+* One thread at a time for the protected code
+* Visibility of changes between threads
+
+## Example
+
+Imagine multiple customers are trying to buy the last product.
+
+```java
+class Product {
+
+    private int stock = 1;
+
+    public synchronized void purchase() {
+
+        if (stock > 0) {
+            System.out.println(
+                Thread.currentThread().getName()
+                + " purchased the product"
+            );
+
+            stock--;
+        } else {
+            System.out.println(
+                Thread.currentThread().getName()
+                + " - Product is out of stock"
+            );
+        }
+    }
+}
+```
+
+If multiple threads call:
+
+```java
+product.purchase();
+```
+
+only one thread can enter the synchronized method at a time.
+
+```text
+Thread-1 → enters purchase()
+           checks stock
+           decreases stock
+           exits
+
+Thread-2 → enters purchase()
+           checks stock
+           sees 0
+           exits
+```
+
+### Important
+
+`synchronized` does not mean other threads cannot access the object.
+
+It means other threads cannot enter a synchronized section protected by the **same lock** while another thread is holding that lock.
+
+## When to use synchronized?
+
+Use it when you have multiple operations that must be treated as one unit.
+
+For example:
+
+```java
+if (balance >= amount) {
+    balance -= amount;
+    saveTransaction();
+}
+```
+
+If multiple threads can execute this at the same time, you may need synchronization.
+
+### Easy way to remember
+
+> `synchronized` → "Only one thread at a time."
+
+---
+
+# 2. volatile
+
+## What is volatile?
+
+`volatile` is mainly used for **visibility**.
+
+It means when one thread changes a volatile variable, other threads reading that variable can see the latest value.
+
+## Example
+
+Imagine a worker thread continuously doing some work.
+
+```java
+class Worker {
+
+    private volatile boolean running = true;
+
+    public void doWork() {
+
+        while (running) {
+            System.out.println("Working...");
+        }
+
+        System.out.println("Worker stopped");
+    }
+
+    public void stop() {
+        running = false;
+    }
+}
+```
+
+Now:
+
+```java
+Worker worker = new Worker();
+
+Thread thread = new Thread(worker::doWork);
+
+thread.start();
+
+// Later
+worker.stop();
+```
+
+The main thread changes:
+
+```java
+running = false;
+```
+
+The worker thread sees the updated value and exits the loop.
+
+```text
+Main Thread
+    |
+    | running = false
+    |
+    ↓
+volatile variable
+    |
+    ↓
+Worker Thread sees false
+    |
+    ↓
+Worker stops
+```
+
+## Why do we need volatile?
+
+Without `volatile`, one thread may not immediately see another thread's update.
+
+With:
+
+```java
+private volatile boolean running;
+```
+
+the updated value is visible to other threads.
+
+## Important: volatile does NOT make compound operations atomic
+
+This is NOT safe:
+
+```java
+private volatile int count = 0;
+
+count++;
+```
+
+Why?
+
+Because:
+
+```text
+count++
+```
+
+is actually multiple steps:
+
+```text
+1. Read count
+2. Add 1
+3. Write count
+```
+
+Two threads can interfere with each other.
+
+So:
+
+```java
+volatile int count;
+count++;
+```
+
+does not make the increment thread-safe.
+
+### Easy way to remember
+
+> `volatile` → "Other threads should see my latest value."
+
+---
+
+# 3. Atomic Classes
+
+Java provides atomic classes such as:
+
+```java
+AtomicInteger
+AtomicLong
+AtomicBoolean
+AtomicReference
+```
+
+They provide thread-safe atomic operations on a shared variable.
+
+## Example: AtomicInteger
+
+Imagine we want to count how many requests our application receives.
+
+```java
+import java.util.concurrent.atomic.AtomicInteger;
+
+class RequestCounter {
+
+    private AtomicInteger count =
+            new AtomicInteger(0);
+
+    public void requestReceived() {
+        count.incrementAndGet();
+    }
+
+    public int getCount() {
+        return count.get();
+    }
+}
+```
+
+Multiple threads can call:
+
+```java
+requestCounter.requestReceived();
+```
+
+Each call safely increments the counter.
+
+```text
+Thread-1 → increment
+Thread-2 → increment
+Thread-3 → increment
+Thread-4 → increment
+
+             ↓
+
+       AtomicInteger
+
+             ↓
+
+       Safe counter value
+```
+
+## Why not use a normal int?
+
+This:
+
+```java
+int count = 0;
+
+count++;
+```
+
+is not safe when many threads update it at the same time.
+
+But:
+
+```java
+AtomicInteger count = new AtomicInteger(0);
+
+count.incrementAndGet();
+```
+
+performs the increment atomically.
+
+## Common AtomicInteger methods
+
+```java
+AtomicInteger count = new AtomicInteger(10);
+```
+
+### Get value
+
+```java
+count.get();
+```
+
+### Set value
+
+```java
+count.set(20);
+```
+
+### Increment
+
+```java
+count.incrementAndGet();
+```
+
+### Decrement
+
+```java
+count.decrementAndGet();
+```
+
+### Add
+
+```java
+count.addAndGet(5);
+``
+```
