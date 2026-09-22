@@ -1318,3 +1318,128 @@ try {
 
 Always release the lock in `finally`.
 
+
+# Java Semaphore & Barrier
+
+## 1. What is Semaphore?
+
+A **Semaphore** controls how many threads can access a resource at the same time.
+
+It works using **permits**.
+
+```java
+Semaphore semaphore = new Semaphore(3);
+```
+
+`3` → 3 permits → maximum 3 threads can enter.
+
+### Basic usage
+
+```java
+semaphore.acquire();
+
+try {
+    // Access limited resource
+} finally {
+    semaphore.release();
+}
+```
+
+```text
+acquire() → Take a permit
+release() → Return a permit
+```
+
+---
+
+## 2. Counting Semaphore
+
+A **Counting Semaphore** has multiple permits.
+
+```java
+Semaphore semaphore = new Semaphore(3);
+```
+
+```text
+Thread 1 ──┐
+Thread 2 ──┼──→ Resource
+Thread 3 ──┘
+
+Thread 4 ──→ WAIT
+```
+
+When one thread calls `release()`, another waiting thread can get the permit.
+
+### Real-world examples
+
+* Limit external API calls
+* Limit file processing
+* Limit expensive operations
+* Limit concurrent downloads
+
+### Interview Definition
+
+> **Counting Semaphore = allows a fixed number of threads to access a resource simultaneously.**
+
+---
+
+# 3. Barrier Synchronization
+
+A **Barrier** is used when multiple threads must **wait for each other** before continuing.
+
+Java provides `CyclicBarrier`.
+
+```java
+CyclicBarrier barrier = new CyclicBarrier(3);
+```
+
+Each thread does:
+
+```java
+barrier.await();
+```
+
+All 3 threads must reach the barrier.
+
+```text
+Thread 1 ──┐
+Thread 2 ──┼──→ Barrier → All continue
+Thread 3 ──┘
+```
+
+### Real-world example
+
+Three independent tasks process data:
+
+```text
+North ──┐
+South ──┼──→ Barrier → Generate final report
+East  ──┘
+```
+
+The tasks are independent, but the final report waits for all of them.
+
+---
+
+# Semaphore vs Barrier
+
+```text
+Semaphore
+    ↓
+Controls ACCESS
+    ↓
+"How many threads can enter?"
+
+Barrier
+    ↓
+Controls SYNCHRONIZATION
+    ↓
+"Wait until everyone reaches this point."
+```
+
+## Easy Interview Memory
+
+> **Semaphore = N permits**
+
+> **Barrier = Wait for everyone**
+
