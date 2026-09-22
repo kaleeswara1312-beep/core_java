@@ -8,10 +8,7 @@ import java.io.InputStream;
 
 class FileOperation {
     public static void main(String[] args) throws IOException {
-        // String currentDirectory = System.getProperty("user.dir");
-        // System.out.println(currentDirectory);
-
-        // File fs = new File(currentDirectory, "Folder\\innerfolder\\innerfolder2");
+        
 
         // if(fs.exists()){
         // System.out.println("Folder exists");
@@ -24,7 +21,10 @@ class FileOperation {
 
         String currentDir = System.getProperty("user.dir");
 
-        File f = new File(currentDir, "sample1.txt");
+        File f = new File(currentDir, "sample1.txt");// String currentDirectory = System.getProperty("user.dir");
+        // System.out.println(currentDirectory);
+
+        // File fs = new File(currentDirectory, "Folder\\innerfolder\\innerfolder2");
 
         // if (f.exists()) {
         // System.out.println(currentDir);

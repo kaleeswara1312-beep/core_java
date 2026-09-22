@@ -936,3 +936,385 @@ count.decrementAndGet();
 count.addAndGet(5);
 ``
 ```
+
+
+# Java Thread Communication
+
+Java threads can communicate with each other using:
+
+* `wait()` → makes the current thread wait.
+* `notify()` → wakes **one** waiting thread.
+* `notifyAll()` → wakes **all** waiting threads.
+
+These methods belong to `Object`, not `Thread`.
+
+## Example: Producer–Consumer
+
+```java
+class SharedData {
+
+    private int value;
+    private boolean available = false;
+
+    synchronized void produce(int value) {
+
+        while (available) {
+            try {
+                wait();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+
+        this.value = value;
+        available = true;
+
+        System.out.println("Produced: " + value);
+
+        notify();       // Wake one waiting thread
+        // notifyAll(); // Wake all waiting threads
+    }
+
+    synchronized int consume() {
+
+        while (!available) {
+            try {
+                wait();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+
+        int result = value;
+        available = false;
+
+        System.out.println("Consumed: " + result);
+
+        notify();
+
+        return result;
+    }
+}
+```
+
+### Main
+
+```java
+public class Main {
+
+    public static void main(String[] args) {
+
+        SharedData data = new SharedData();
+
+        Thread producer = new Thread(() -> {
+            for (int i = 1; i <= 5; i++) {
+                data.produce(i);
+            }
+        });
+
+        Thread consumer = new Thread(() -> {
+            for (int i = 1; i <= 5; i++) {
+                data.consume();
+            }
+        });
+
+        producer.start();
+        consumer.start();
+    }
+}
+```
+
+## Important Points
+
+### `wait()`
+
+```java
+wait();
+```
+
+* Current thread enters `WAITING`.
+* Releases the object's lock.
+* Used when a condition is not satisfied.
+
+### `notify()`
+
+```java
+notify();
+```
+
+* Wakes **one** waiting thread.
+* The awakened thread must acquire the lock before continuing.
+
+### `notifyAll()`
+
+```java
+notifyAll();
+```
+
+* Wakes **all** threads waiting on that object's monitor.
+* They compete for the lock one by one.
+
+## Interview Points
+
+### 1. No guaranteed thread order
+
+```java
+producer.start();
+consumer.start();
+```
+
+does **not** guarantee that the producer runs first.
+
+The JVM/OS scheduler decides which thread runs first.
+
+### 2. Why use `while`, not `if`?
+
+```java
+while (!available) {
+    wait();
+}
+```
+
+After waking up, the thread should **re-check the condition** before continuing.
+
+### 3. Must be used with synchronization
+
+`wait()`, `notify()`, and `notifyAll()` must be called while the thread owns the object's monitor, normally inside a `synchronized` method/block.
+
+### Easy way to remember
+
+```text
+wait()       → "I cannot continue, let me wait."
+notify()     → "Wake one waiting thread."
+notifyAll()  → "Wake all waiting threads."
+```
+
+
+# Java Locks
+
+A **lock** controls access to shared data when multiple threads are running.
+
+## Types of Locks
+
+```text
+Java Locks
+│
+├── Intrinsic Lock → synchronized
+│
+├── ReentrantLock
+│
+├── ReadWriteLock
+│   ├── Read Lock
+│   └── Write Lock
+│
+└── StampedLock
+    ├── Read Lock
+    ├── Write Lock
+    └── Optimistic Read
+```
+
+---
+
+## 1. Intrinsic Lock (`synchronized`)
+
+Every Java object has an intrinsic/monitor lock.
+
+```java
+synchronized void increment() {
+    count++;
+}
+```
+
+Only **one thread** can execute the synchronized section for the same object at a time.
+
+### Production Example
+
+Updating shared application data:
+
+```java
+synchronized void updateBalance(double amount) {
+    balance += amount;
+}
+```
+
+---
+
+# 2. ReentrantLock
+
+Explicit lock from `java.util.concurrent.locks`.
+
+```java
+Lock lock = new ReentrantLock();
+
+void increment() {
+
+    lock.lock();
+
+    try {
+        count++;
+    } finally {
+        lock.unlock();
+    }
+}
+```
+
+### Why use it?
+
+Compared with `synchronized`, it provides more control:
+
+* `tryLock()`
+* Interruptible locking
+* Fairness option
+* `Condition`
+
+### Production Example
+
+Protecting a shared in-memory cache:
+
+```java
+private final Lock lock = new ReentrantLock();
+
+void updateCache(String key, String value) {
+
+    lock.lock();
+
+    try {
+        cache.put(key, value);
+    } finally {
+        lock.unlock();
+    }
+}
+```
+
+---
+
+# 3. ReadWriteLock
+
+Useful when **reads are frequent and writes are less frequent**.
+
+```text
+ReadWriteLock
+     |
+     ├── Read Lock  → Multiple readers allowed
+     |
+     └── Write Lock → Only one writer
+```
+
+Example:
+
+```java
+ReadWriteLock lock = new ReentrantReadWriteLock();
+
+void read() {
+
+    lock.readLock().lock();
+
+    try {
+        System.out.println(data);
+    } finally {
+        lock.readLock().unlock();
+    }
+}
+
+void write(String value) {
+
+    lock.writeLock().lock();
+
+    try {
+        data = value;
+    } finally {
+        lock.writeLock().unlock();
+    }
+}
+```
+
+### Production Example
+
+Application configuration/cache:
+
+```text
+Many requests
+     |
+     ├── Read configuration
+     ├── Read configuration
+     └── Read configuration
+
+Occasionally:
+
+Admin updates configuration
+          ↓
+      Write Lock
+```
+
+Multiple requests can read simultaneously, while an update gets exclusive access.
+
+---
+
+# 4. StampedLock
+
+Advanced lock mainly useful for read-heavy scenarios.
+
+It supports:
+
+* Read lock
+* Write lock
+* Optimistic read
+
+```java
+StampedLock lock = new StampedLock();
+
+long stamp = lock.tryOptimisticRead();
+
+String value = data;
+
+if (!lock.validate(stamp)) {
+    // Data changed, read again using read lock
+}
+```
+
+Usually learn this **after** `ReentrantLock` and `ReadWriteLock`.
+
+---
+
+# ReentrantLock vs ReadWriteLock
+
+| ReentrantLock        | ReadWriteLock                |
+| -------------------- | ---------------------------- |
+| General-purpose lock | Read-heavy situations        |
+| One lock             | Read + Write locks           |
+| One thread at a time | Multiple readers allowed     |
+| `lock()`             | `readLock()` / `writeLock()` |
+| Good for updates     | Good for cache/config reads  |
+
+## Interview Quick Revision
+
+```text
+synchronized
+→ Simple built-in locking
+
+ReentrantLock
+→ More control over locking
+
+ReadWriteLock
+→ Many readers + fewer writers
+
+StampedLock
+→ Advanced read/write + optimistic reading
+```
+
+### Important Rule
+
+With explicit locks:
+
+```java
+lock.lock();
+
+try {
+    // critical section
+} finally {
+    lock.unlock();
+}
+```
+
+Always release the lock in `finally`.
+
