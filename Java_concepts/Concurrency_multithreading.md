@@ -1443,3 +1443,486 @@ Controls SYNCHRONIZATION
 
 > **Barrier = Wait for everyone**
 
+# Concurrent Collections
+
+## 1. Map
+
+`Map<K,V>` is an **interface** that stores data as:
+
+```java
+key → value
+```
+
+Example:
+
+```java
+Map<Integer, String> map = new HashMap<>();
+map.put(1, "A");
+```
+
+### Important Points
+
+* Keys must be **unique**.
+* Values can be duplicated.
+* `Map` itself does not define the internal data structure.
+* Implementations include:
+
+  * `HashMap`
+  * `Hashtable`
+  * `TreeMap`
+  * `ConcurrentHashMap`
+  * `LinkedHashMap`
+
+---
+
+# 2. HashMap
+
+```java
+Map<Integer, String> map = new HashMap<>();
+```
+
+### Internal Working
+
+Uses a **hash table**:
+
+```text
+HashMap
+   ↓
+Array of buckets
+   ↓
+Node → Node → Node
+              ↓
+        Red-Black Tree
+        (heavy collision)
+```
+
+When inserting:
+
+```text
+key
+ ↓
+hashCode()
+ ↓
+hash
+ ↓
+bucket index
+ ↓
+Node(key, value)
+```
+
+Java 8+ can convert a heavily-collided bucket from a linked list to a **Red-Black Tree**.
+
+### Synchronization
+
+* ❌ Not synchronized
+* ❌ Not thread-safe
+* Multiple threads modifying it concurrently can cause problems.
+
+### Null
+
+```java
+map.put(null, "A");     // allowed
+map.put(1, null);       // allowed
+```
+
+* One `null` key
+* Multiple `null` values
+
+### Insertion Order
+
+❌ **Not guaranteed**
+
+```text
+Inserted: 3, 1, 2
+
+Iteration:
+Not guaranteed to be 3, 1, 2
+```
+
+### ConcurrentModificationException
+
+Its iterator is **fail-fast**.
+
+```java
+Map<Integer, String> map = new HashMap<>();
+
+map.put(1, "A");
+map.put(2, "B");
+map.put(3, "C");
+
+for (Integer key : map.keySet()) {
+
+    if (key == 2) {
+        map.put(4, "D"); // ❌
+    }
+}
+```
+
+Can produce:
+
+```text
+ConcurrentModificationException
+```
+
+**Important:** Multiple threads are NOT required. Modifying the map structurally while its iterator is active can cause the exception.
+
+---
+
+# 3. Hashtable
+
+```java
+Map<Integer, String> map = new Hashtable<>();
+```
+
+### Internal Working
+
+Also uses a **hash-table-based structure**.
+
+```text
+Hashtable
+    ↓
+Array of buckets
+    ↓
+Entry → Entry → Entry
+```
+
+It is an older Java collection.
+
+### Synchronization
+
+* ✅ Synchronized
+* ✅ Thread-safe
+* Methods are synchronized.
+
+Conceptually:
+
+```java
+public synchronized V put(K key, V value)
+```
+
+This can cause more contention because operations are synchronized at the map level.
+
+### Null
+
+❌ Null key not allowed
+
+```java
+map.put(null, "A"); // NullPointerException
+```
+
+❌ Null value not allowed
+
+```java
+map.put(1, null);   // NullPointerException
+```
+
+### Insertion Order
+
+❌ **Not guaranteed**
+
+### ConcurrentModificationException
+
+Its iterator is also **fail-fast**.
+
+```java
+Hashtable<Integer, String> table = new Hashtable<>();
+
+table.put(1, "A");
+table.put(2, "B");
+table.put(3, "C");
+
+for (Integer key : table.keySet()) {
+
+    if (key == 2) {
+        table.put(4, "D"); // ❌
+    }
+}
+```
+
+Can produce:
+
+```text
+ConcurrentModificationException
+```
+
+### Important
+
+```text
+Synchronized ≠ Iterator allows modification
+```
+
+`Hashtable` is thread-safe for its operations, but its iterator can still be fail-fast.
+
+---
+
+# 4. TreeMap
+
+```java
+Map<Integer, String> map = new TreeMap<>();
+```
+
+### Internal Working
+
+Uses a **Red-Black Tree**.
+
+```text
+             10
+            /  \
+           5    20
+          / \
+         2   7
+```
+
+Keys are automatically maintained in **sorted order**.
+
+Example:
+
+```java
+map.put(30, "C");
+map.put(10, "A");
+map.put(20, "B");
+```
+
+Iteration:
+
+```text
+10 → 20 → 30
+```
+
+### Synchronization
+
+* ❌ Not synchronized
+* ❌ Not thread-safe
+
+### Null
+
+❌ `null` key generally not allowed with natural ordering.
+
+```java
+map.put(null, "A"); // NullPointerException
+```
+
+Values can be `null`:
+
+```java
+map.put(1, null);   // allowed
+```
+
+### Insertion Order
+
+❌ Does not maintain insertion order.
+
+Instead:
+
+✅ Maintains **sorted key order**.
+
+```text
+Inserted: 30, 10, 20
+
+Output:   10, 20, 30
+```
+
+### ConcurrentModificationException
+
+Its normal iterator is **fail-fast**.
+
+```java
+TreeMap<Integer, String> map = new TreeMap<>();
+
+map.put(1, "A");
+map.put(2, "B");
+map.put(3, "C");
+
+for (Integer key : map.keySet()) {
+
+    if (key == 2) {
+        map.put(4, "D"); // ❌
+    }
+}
+```
+
+Can produce:
+
+```text
+ConcurrentModificationException
+```
+
+---
+
+# 5. ConcurrentHashMap
+
+```java
+Map<Integer, String> map = new ConcurrentHashMap<>();
+```
+
+### Internal Working
+
+Uses a hash-table-based structure with:
+
+* Array of buckets
+* Nodes
+* Linked lists
+* Red-Black Trees for heavy collisions
+* CAS (Compare-And-Swap)
+* Fine-grained synchronization
+
+Conceptually:
+
+```text
+ConcurrentHashMap
+       ↓
+   Node[] table
+       ↓
+ ┌─────┬─────┬─────┬─────┐
+ │ B1  │ B2  │ B3  │ B4  │
+ └─────┴─────┴─────┴─────┘
+    ↓          ↓
+  Nodes      Tree
+```
+
+It does **not lock the entire map for every operation**.
+
+Different threads can work concurrently.
+
+```text
+Thread 1 → Bucket 1
+Thread 2 → Bucket 5
+Thread 3 → Bucket 8
+```
+
+### Synchronization
+
+* ✅ Thread-safe
+* Uses **CAS + localized synchronization**
+* Allows high concurrency
+* Better suited for concurrent applications than `Hashtable`
+
+### Null
+
+❌ Null key not allowed
+
+```java
+map.put(null, "A"); // NullPointerException
+```
+
+❌ Null value not allowed
+
+```java
+map.put(1, null);   // NullPointerException
+```
+
+Why?
+
+Because `null` cannot safely represent the distinction between:
+
+```text
+key doesn't exist
+        vs
+key exists with null value
+```
+
+### Insertion Order
+
+❌ **Not guaranteed**
+
+### ConcurrentModificationException
+
+Its iterator is **weakly consistent**, not fail-fast.
+
+```java
+ConcurrentHashMap<Integer, String> map =
+        new ConcurrentHashMap<>();
+
+map.put(1, "A");
+map.put(2, "B");
+map.put(3, "C");
+
+for (Integer key : map.keySet()) {
+
+    if (key == 2) {
+        map.put(4, "D"); // ✅ allowed
+    }
+}
+```
+
+It does **not** throw `ConcurrentModificationException` just because the map is modified during iteration.
+
+The iterator may or may not reflect modifications made during the iteration.
+
+---
+
+# Quick Comparison
+
+| Feature                        | HashMap             | Hashtable               | TreeMap        | ConcurrentHashMap           |
+| ------------------------------ | ------------------- | ----------------------- | -------------- | --------------------------- |
+| Type                           | Hash table          | Hash table              | Red-Black Tree | Concurrent hash table       |
+| Thread-safe                    | ❌                   | ✅                       | ❌              | ✅                           |
+| Synchronized                   | ❌                   | ✅                       | ❌              | Concurrent mechanisms       |
+| Null key                       | ✅ 1                 | ❌                       | ❌*             | ❌                           |
+| Null values                    | ✅                   | ❌                       | ✅              | ❌                           |
+| Order                          | No guarantee        | No guarantee            | Sorted by key  | No guarantee                |
+| Iterator                       | Fail-fast           | Fail-fast               | Fail-fast      | Weakly consistent           |
+| CME during direct modification | Possible            | Possible                | Possible       | No                          |
+| Performance                    | Fast                | Slower under contention | `O(log n)`     | Fast concurrent access      |
+| Main use                       | General-purpose map | Legacy synchronized map | Sorted keys    | Multi-threaded applications |
+
+`*` TreeMap with a custom comparator can have different null-key behavior depending on the comparator.
+
+---
+
+# Easy Interview Memory Trick
+
+```text
+HashMap
+→ Fast
+→ Not thread-safe
+→ Allows null
+→ No order
+
+Hashtable
+→ Synchronized
+→ Thread-safe
+→ No null
+→ No order
+→ Legacy
+
+TreeMap
+→ Red-Black Tree
+→ Sorted keys
+→ Not thread-safe
+→ No null key
+
+ConcurrentHashMap
+→ Thread-safe
+→ CAS + fine-grained synchronization
+→ No null
+→ No guaranteed order
+→ Weakly consistent iterator
+```
+
+## One-Line Interview Answers
+
+**HashMap:**
+
+> HashMap uses a hash-table structure with buckets, linked lists and Red-Black Trees for heavy collisions.
+
+**Hashtable:**
+
+> Hashtable is a legacy synchronized hash-table implementation where operations are synchronized.
+
+**TreeMap:**
+
+> TreeMap uses a Red-Black Tree and maintains keys in sorted order.
+
+**ConcurrentHashMap:**
+
+> ConcurrentHashMap is a thread-safe hash-table implementation that uses CAS and localized synchronization to allow multiple threads to operate concurrently.
+
+**Most important distinction:**
+
+```text
+HashMap          → Not thread-safe
+Hashtable        → Thread-safe, synchronized
+TreeMap          → Sorted, not thread-safe
+ConcurrentHashMap→ Thread-safe + concurrent
+```
