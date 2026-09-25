@@ -1926,3 +1926,219 @@ Hashtable        → Thread-safe, synchronized
 TreeMap          → Sorted, not thread-safe
 ConcurrentHashMap→ Thread-safe + concurrent
 ```
+
+# ArrayList vs CopyOnWriteArrayList
+
+|                             | ArrayList                                        | CopyOnWriteArrayList            |
+| --------------------------- | ------------------------------------------------ | ------------------------------- |
+| **Thread safety**           | ❌ Not thread-safe                                | ✅ Thread-safe                   |
+| **Read**                    | Fast                                             | Fast                            |
+| **Write**                   | Fast                                             | Expensive — copies entire array |
+| **Best use**                | Single-threaded / externally synchronized access | Many reads + rare writes        |
+| **Concurrent read + write** | ❌ Unsafe                                         | ✅ Safe                          |
+
+### ArrayList
+
+**One line:** `ArrayList` directly modifies its internal array, so concurrent read/write is not thread-safe.
+
+```java
+List<String> list = new ArrayList<>();
+
+// Thread 1
+list.add("D");
+
+// Thread 2
+for (String value : list) {
+    System.out.println(value);
+}
+```
+
+Concurrent modification can cause inconsistent behavior or `ConcurrentModificationException`.
+
+---
+
+### CopyOnWriteArrayList
+
+**One line:** On every write, it creates a new array and publishes it, while existing readers can continue using the old array.
+
+```java
+List<String> list = new CopyOnWriteArrayList<>();
+
+// Initial
+[A, B, C]
+
+// Thread 1 → WRITE
+list.add("D");
+
+// Internally
+Old → [A, B, C]
+New → [A, B, C, D]
+
+// Existing reader → can continue with [A, B, C]
+// New reader      → sees [A, B, C, D]
+```
+
+### Interview Rule
+
+> **ArrayList = fast reads + fast writes, but not thread-safe.**
+> **CopyOnWriteArrayList = thread-safe reads + writes, optimized for many reads and rare writes.**
+
+
+# BlockingQueue
+
+`BlockingQueue` is a thread-safe queue where a thread can wait when the queue is full or empty.
+
+## 1. ArrayBlockingQueue
+
+**Interview sentence:**
+`ArrayBlockingQueue` is a fixed-size, thread-safe queue that stores elements in an array.
+
+### Example
+
+```java
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
+
+public class Main {
+    public static void main(String[] args) throws InterruptedException {
+
+        BlockingQueue<String> queue =
+                new ArrayBlockingQueue<>(3);
+
+        queue.put("Task-1");
+        queue.put("Task-2");
+        queue.put("Task-3");
+
+        System.out.println(queue.take());
+    }
+}
+```
+
+### Explanation
+
+```text
+Capacity = 3
+
+Task-1
+Task-2
+Task-3  -> Queue is full
+
+put()   -> waits if queue is full
+take()  -> waits if queue is empty
+```
+
+**Use:** When you want a queue with a fixed maximum size.
+
+---
+
+## 2. LinkedBlockingQueue
+
+**Interview sentence:**
+`LinkedBlockingQueue` is a thread-safe queue that uses linked nodes and can have a fixed capacity.
+
+### Example
+
+```java
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+
+public class Main {
+    public static void main(String[] args) throws InterruptedException {
+
+        BlockingQueue<String> queue =
+                new LinkedBlockingQueue<>(3);
+
+        queue.put("Task-1");
+        queue.put("Task-2");
+
+        System.out.println(queue.take());
+    }
+}
+```
+
+### Explanation
+
+```text
+Task-1 -> Task-2 -> ...
+
+put()   -> waits if queue is full
+take()  -> waits if queue is empty
+```
+
+**Use:** Commonly used for producer-consumer tasks.
+
+---
+
+# ConcurrentLinkedQueue
+
+**Interview sentence:**
+`ConcurrentLinkedQueue` is a thread-safe FIFO queue where operations do not wait when the queue is empty or full.
+
+### Example
+
+```java
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
+
+public class Main {
+    public static void main(String[] args) {
+
+        Queue<String> queue =
+                new ConcurrentLinkedQueue<>();
+
+        queue.offer("Task-1");
+        queue.offer("Task-2");
+
+        System.out.println(queue.poll());
+        System.out.println(queue.poll());
+        System.out.println(queue.poll());
+    }
+}
+```
+
+### Output
+
+```text
+Task-1
+Task-2
+null
+```
+
+### Explanation
+
+```text
+offer() -> adds the element
+poll()  -> removes the element
+poll()  -> returns null if queue is empty
+```
+
+Unlike `BlockingQueue`, it **does not wait** when the queue is empty.
+
+---
+
+# Simple Difference
+
+| Queue                   | Main Point                            |
+| ----------------------- | ------------------------------------- |
+| `ArrayBlockingQueue`    | Fixed-size array-based blocking queue |
+| `LinkedBlockingQueue`   | Linked-node blocking queue            |
+| `ConcurrentLinkedQueue` | Thread-safe queue that does not wait  |
+
+### Easy way to remember
+
+```text
+BlockingQueue
+     |
+     +-- ArrayBlockingQueue
+     |      -> Array
+     |      -> Fixed capacity
+     |
+     +-- LinkedBlockingQueue
+            -> Linked nodes
+            -> Can have fixed capacity
+
+ConcurrentLinkedQueue
+     -> Thread-safe
+     -> Does NOT wait
+```
+
