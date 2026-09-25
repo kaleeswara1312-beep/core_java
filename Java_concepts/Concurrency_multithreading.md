@@ -2142,3 +2142,574 @@ ConcurrentLinkedQueue
      -> Does NOT wait
 ```
 
+# Future & CompletableFuture – Interview Quick Reference
+
+## 1. Future
+
+`Future` represents the **result of an asynchronous task** that may be available later.
+
+### Basic Example
+
+```java
+ExecutorService executor = Executors.newFixedThreadPool(2);
+
+Future<Integer> future = executor.submit(() -> {
+    Thread.sleep(2000);
+    return 100;
+});
+
+System.out.println("Main thread continues...");
+
+Integer result = future.get(); // waits until task completes
+System.out.println(result);
+
+executor.shutdown();
+```
+
+### Important Future Methods
+
+| Method               | Meaning                                   |
+| -------------------- | ----------------------------------------- |
+| `get()`              | Waits until result is available           |
+| `get(timeout, unit)` | Waits only for specified time             |
+| `isDone()`           | Checks whether task is completed          |
+| `isCancelled()`      | Checks whether task was cancelled         |
+| `cancel(true)`       | Attempts to cancel the task               |
+| `resultNow()`        | Gets result immediately if completed      |
+| `exceptionNow()`     | Gets exception immediately if task failed |
+| `state()`            | Returns task state                        |
+
+### `get()` vs `join()`
+
+```java
+future.get();
+```
+
+* Waits for result.
+* Throws **checked exceptions** such as `InterruptedException` and `ExecutionException`.
+
+```java
+future.join();
+```
+
+* Mainly used with `CompletableFuture`.
+* Waits for result.
+* Throws **unchecked `CompletionException`**.
+
+---
+
+# 2. CompletableFuture
+
+`CompletableFuture` is an advanced Future that supports **asynchronous execution and chaining of tasks**.
+
+```text
+Future
+  ↓
+Get result manually
+
+CompletableFuture
+  ↓
+Run → Transform → Combine → Handle result
+```
+
+### Basic Example
+
+```java
+CompletableFuture<Integer> future =
+        CompletableFuture.supplyAsync(() -> 100);
+
+Integer result = future.join();
+
+System.out.println(result);
+```
+
+---
+
+# 3. `runAsync()` vs `supplyAsync()`
+
+### `runAsync()`
+
+Used when there is **no return value**.
+
+```java
+CompletableFuture<Void> future =
+        CompletableFuture.runAsync(() -> {
+            System.out.println("Task running");
+        });
+```
+
+### `supplyAsync()`
+
+Used when there **is a return value**.
+
+```java
+CompletableFuture<Integer> future =
+        CompletableFuture.supplyAsync(() -> 100);
+
+System.out.println(future.join());
+```
+
+---
+
+# 4. Chaining
+
+### `thenApply()`
+
+Transforms the result.
+
+```java
+CompletableFuture<Integer> future =
+        CompletableFuture.supplyAsync(() -> 10)
+                .thenApply(x -> x * 2);
+
+System.out.println(future.join()); // 20
+```
+
+**Interview:** `thenApply()` = **map/transform result**.
+
+---
+
+### `thenAccept()`
+
+Consumes the result but returns nothing.
+
+```java
+CompletableFuture.supplyAsync(() -> 10)
+        .thenAccept(x -> System.out.println(x));
+```
+
+**Interview:** `thenAccept()` = **consume result**.
+
+---
+
+### `thenRun()`
+
+Runs another task without using the previous result.
+
+```java
+CompletableFuture.supplyAsync(() -> 10)
+        .thenRun(() -> System.out.println("Completed"));
+```
+
+**Interview:** `thenRun()` = **run something after completion**.
+
+---
+
+# 5. `thenCompose()`
+
+Used when one asynchronous task starts **another asynchronous task**.
+
+```java
+CompletableFuture<User> user =
+        CompletableFuture.supplyAsync(() -> getUser());
+
+CompletableFuture<String> result =
+        user.thenCompose(u ->
+                CompletableFuture.supplyAsync(() -> getAddress(u)));
+```
+
+**Interview:** `thenCompose()` = **chain dependent async operations**.
+
+```text
+Future<User>
+     ↓
+thenCompose()
+     ↓
+Future<Address>
+```
+
+---
+
+# 6. `thenCombine()`
+
+Combines results of **two independent CompletableFutures**.
+
+```java
+CompletableFuture<Integer> f1 =
+        CompletableFuture.supplyAsync(() -> 10);
+
+CompletableFuture<Integer> f2 =
+        CompletableFuture.supplyAsync(() -> 20);
+
+CompletableFuture<Integer> result =
+        f1.thenCombine(f2, (a, b) -> a + b);
+
+System.out.println(result.join()); // 30
+```
+
+**Interview:** `thenCombine()` = **combine two independent results**.
+
+---
+
+# 7. `allOf()`
+
+Waits for **all CompletableFutures** to complete.
+
+```java
+CompletableFuture<Void> all =
+        CompletableFuture.allOf(f1, f2);
+
+all.join();
+```
+
+**Interview:** `allOf()` = **wait for all tasks**.
+
+> Note: `allOf()` returns `CompletableFuture<Void>`, so results must be obtained separately.
+
+---
+
+# 8. `anyOf()`
+
+Completes when **any one Future completes**.
+
+```java
+CompletableFuture<Object> result =
+        CompletableFuture.anyOf(f1, f2);
+
+System.out.println(result.join());
+```
+
+**Interview:** `anyOf()` = **first completed task wins**.
+
+---
+
+# 9. Exception Handling
+
+### `exceptionally()`
+
+Handles an exception and provides a fallback result.
+
+```java
+CompletableFuture<Integer> future =
+        CompletableFuture.supplyAsync(() -> {
+            throw new RuntimeException("Error");
+        })
+        .exceptionally(ex -> 0);
+
+System.out.println(future.join()); // 0
+```
+
+**Interview:** `exceptionally()` = **recover from exception**.
+
+---
+
+### `handle()`
+
+Handles **both success and failure**.
+
+```java
+CompletableFuture<Integer> future =
+        CompletableFuture.supplyAsync(() -> 10)
+        .handle((result, exception) -> {
+            if (exception != null)
+                return 0;
+
+            return result * 2;
+        });
+```
+
+**Interview:** `handle()` = **process result or exception**.
+
+---
+
+### `whenComplete()`
+
+Executes after completion for logging/cleanup.
+
+```java
+CompletableFuture.supplyAsync(() -> 10)
+        .whenComplete((result, exception) -> {
+            System.out.println("Task completed");
+        });
+```
+
+**Interview:** `whenComplete()` = **observe completion; normally doesn't transform the result**.
+
+---
+
+# 10. `thenApply()` vs `thenCompose()`
+
+### `thenApply`
+
+One result → transformed result.
+
+```java
+CompletableFuture<String> result =
+        future.thenApply(x -> x.toString());
+```
+
+### `thenCompose`
+
+One Future → another Future.
+
+```java
+CompletableFuture<String> result =
+        future.thenCompose(x ->
+                CompletableFuture.supplyAsync(() -> getData(x)));
+```
+
+### Easy Interview Trick
+
+```text
+thenApply  → Function
+thenCompose → Future inside Future
+```
+
+---
+
+# 11. `thenCombine()` vs `thenCompose()`
+
+```text
+thenCompose
+     ↓
+A → B
+Dependent tasks
+```
+
+```text
+thenCombine
+     ↓
+A ─┐
+   ├→ C
+B ─┘
+Independent tasks
+```
+
+---
+
+# 12. `get()` vs `join()`
+
+```java
+future.get();
+```
+
+* Blocks until completion.
+* Checked exceptions.
+
+```java
+future.join();
+```
+
+* Blocks until completion.
+* Unchecked `CompletionException`.
+
+**Interview answer:**
+
+> `get()` is the Future-style method and requires checked exception handling, while `join()` is commonly used with CompletableFuture and wraps failures in unchecked exceptions.
+
+---
+
+# 13. `CompletableFuture` Important Methods – One Line
+
+| Method                    | Interview Meaning                             |
+| ------------------------- | --------------------------------------------- |
+| `runAsync()`              | Async task without result                     |
+| `supplyAsync()`           | Async task with result                        |
+| `thenApply()`             | Transform result                              |
+| `thenAccept()`            | Consume result                                |
+| `thenRun()`               | Run after completion                          |
+| `thenCompose()`           | Chain dependent async tasks                   |
+| `thenCombine()`           | Combine two independent tasks                 |
+| `allOf()`                 | Wait for all tasks                            |
+| `anyOf()`                 | Complete when any task finishes               |
+| `exceptionally()`         | Recover from exception                        |
+| `handle()`                | Handle success + exception                    |
+| `whenComplete()`          | Observe completion                            |
+| `get()`                   | Wait and get result                           |
+| `join()`                  | Wait and get result without checked exception |
+| `isDone()`                | Check completion                              |
+| `cancel()`                | Cancel task                                   |
+| `complete()`              | Manually complete Future                      |
+| `completeExceptionally()` | Complete with exception                       |
+| `orTimeout()`             | Fail if timeout occurs                        |
+| `completeOnTimeout()`     | Provide default value on timeout              |
+
+---
+
+# 14. `complete()` Example
+
+```java
+CompletableFuture<String> future =
+        new CompletableFuture<>();
+
+future.complete("Hello");
+
+System.out.println(future.join());
+```
+
+**Interview:** `complete()` manually supplies the result.
+
+---
+
+# 15. `completeExceptionally()`
+
+```java
+future.completeExceptionally(
+        new RuntimeException("Failed")
+);
+```
+
+**Interview:** Manually completes the Future with an exception.
+
+---
+
+# 16. Timeout
+
+### `orTimeout()`
+
+```java
+future.orTimeout(2, TimeUnit.SECONDS);
+```
+
+If it doesn't complete within 2 seconds → completes exceptionally.
+
+### `completeOnTimeout()`
+
+```java
+future.completeOnTimeout(
+        "Default",
+        2,
+        TimeUnit.SECONDS
+);
+```
+
+If it doesn't complete within 2 seconds → returns `"Default"`.
+
+---
+
+# 17. Complete Real-World Example
+
+```java
+CompletableFuture<User> userFuture =
+        CompletableFuture.supplyAsync(() -> getUser());
+
+CompletableFuture<String> result =
+        userFuture
+                .thenApply(User::getName)
+                .exceptionally(ex -> "Unknown");
+
+System.out.println(result.join());
+```
+
+### Flow
+
+```text
+Async getUser()
+      ↓
+User
+      ↓
+thenApply()
+      ↓
+User name
+      ↓
+exceptionally()
+      ↓
+Final result
+```
+
+---
+
+# 18. Executor
+
+By default:
+
+```java
+CompletableFuture.supplyAsync(() -> task());
+```
+
+uses the **common ForkJoinPool**.
+
+You can provide your own executor:
+
+```java
+ExecutorService executor =
+        Executors.newFixedThreadPool(5);
+
+CompletableFuture<Integer> future =
+        CompletableFuture.supplyAsync(
+                () -> 100,
+                executor
+        );
+```
+
+**Interview:** Use a custom executor when you want control over thread-pool size and workload isolation.
+
+---
+
+# 19. Future vs CompletableFuture
+
+| Future                           | CompletableFuture                         |
+| -------------------------------- | ----------------------------------------- |
+| Basic async result               | Advanced async programming                |
+| `get()` to obtain result         | Supports chaining                         |
+| Difficult to combine tasks       | Easy to combine tasks                     |
+| Limited exception handling       | Built-in exception handling               |
+| Cannot easily compose operations | Supports `thenApply`, `thenCompose`, etc. |
+| Mainly represents result         | Represents + controls async computation   |
+
+### One-Line Interview Answer
+
+> **Future represents the result of an asynchronous computation, while CompletableFuture extends that idea by providing non-blocking composition, chaining, combination, and exception handling.**
+
+---
+
+# 20. Most Important Interview Methods
+
+Remember these first:
+
+```text
+supplyAsync()
+runAsync()
+
+thenApply()
+thenAccept()
+thenRun()
+
+thenCompose()
+thenCombine()
+
+allOf()
+anyOf()
+
+exceptionally()
+handle()
+whenComplete()
+
+get()
+join()
+
+complete()
+completeExceptionally()
+
+orTimeout()
+completeOnTimeout()
+```
+
+### Quick Memory Trick
+
+```text
+START
+ ↓
+supplyAsync / runAsync
+ ↓
+TRANSFORM
+ ↓
+thenApply
+ ↓
+CHAIN
+ ↓
+thenCompose
+ ↓
+COMBINE
+ ↓
+thenCombine / allOf / anyOf
+ ↓
+HANDLE ERROR
+ ↓
+exceptionally / handle / whenComplete
+ ↓
+GET RESULT
+ ↓
+join / get
+```
+
