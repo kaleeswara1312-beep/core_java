@@ -427,3 +427,184 @@ Regardless of which synchronous HTTP client you choose:
 - **OpenFeign:** Declarative HTTP client that generates request behavior from annotated interfaces.
 
 For a new Spring Boot microservices application, RestClient and OpenFeign are both reasonable options. Choose RestClient when you prefer explicit, fluent HTTP code; choose OpenFeign when you prefer declarative interfaces and centralized per-service client configuration.
+
+# Eureka Service Discovery in Microservices
+
+## 1. What is Service Discovery?
+
+In a microservices architecture, one service often needs to communicate with another service.
+
+Without service discovery, we may hardcode the target service URL in our code. For example:
+
+```java
+@FeignClient(name = "inventory", url = "http://localhost:8001")
+```
+
+If the inventory service changes its port or host, we may need to update the configuration.
+
+To avoid hardcoding the target instance's address, we use **Eureka Service Discovery**.
+
+Eureka maintains a registry of service instances. Instead of specifying the actual URL in Feign, we specify the service name.
+
+```java
+@FeignClient(name = "ecom-inventory-service")
+```
+
+Eureka-based discovery, together with Spring Cloud LoadBalancer, helps locate an available instance dynamically.
+
+## 2. Service Registration Flow
+
+When an Order Service or Inventory Service starts, the following process generally occurs:
+
+1. The Spring Boot application starts.
+2. The Eureka client initializes and obtains information about its service instance.
+3. The client creates or maintains its instance information, such as application name, host, and port.
+4. The client registers the instance with the Eureka Server through an HTTP request.
+5. Eureka updates its in-memory service registry.
+6. The client periodically sends heartbeats to renew its lease.
+7. The client periodically fetches registry information to refresh its local cache.
+
+**Flow:**
+
+`Spring Boot Application → Eureka Client → Instance Information → Registration Request → Eureka Registry Updated`
+
+Heartbeats and registry fetching are periodic processes; they do not necessarily start in the exact sequence shown above.
+
+## 3. Service Registry and Local Cache
+
+Eureka Server maintains the registry of registered service instances, including their addresses and ports.
+
+Eureka clients can maintain a local cache of service registry information.
+
+For example, suppose Eureka has registered three instances:
+
+| Service name | Host | Port |
+|---|---|---|
+| ecom-inventory-service | localhost | 8001 |
+| ecom-inventory-service | localhost | 8002 |
+| ecom-inventory-service | localhost | 8003 |
+
+When Order Service needs to call Inventory Service, it can use the local registry information instead of querying Eureka for every request.
+
+The default registry fetch interval is commonly **30 seconds**.
+
+### Configure the registry refresh interval
+
+In the Eureka client's `application.yml`:
+
+```yaml
+eureka:
+  client:
+    registry-fetch-interval-seconds: 10
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+```
+
+Here, `registry-fetch-interval-seconds: 10` configures the client to refresh its registry information every 10 seconds.
+
+**Important:** The first service call does not necessarily contact Eureka. The local cache may already be populated during application startup.
+
+## 4. Heartbeats and Health Checks
+
+Eureka needs to know whether registered service instances are still available.
+
+### Heartbeat
+
+A Eureka client periodically sends a heartbeat to renew its lease.
+
+The default heartbeat interval is commonly **30 seconds**.
+
+### Unexpected shutdown
+
+If a service crashes or becomes unreachable, Eureka stops receiving heartbeats. The instance may be removed after its lease expires, depending on eviction behavior and self-preservation settings.
+
+### Graceful shutdown
+
+When an application shuts down gracefully, its Eureka client normally attempts to unregister the instance from Eureka rather than waiting for lease expiration.
+
+### Configure heartbeat and lease expiration
+
+```yaml
+eureka:
+  instance:
+    lease-renewal-interval-in-seconds: 10
+    lease-expiration-duration-in-seconds: 30
+```
+
+- `lease-renewal-interval-in-seconds`: Sends heartbeats every 10 seconds.
+- `lease-expiration-duration-in-seconds`: The lease expires after 30 seconds without a successful renewal, subject to Eureka's eviction behavior.
+
+These values are examples for learning and are not necessarily suitable for production.
+
+### Heartbeat vs. Health Check
+
+- **Heartbeat:** Indicates that the instance is communicating with Eureka.
+- **Health check:** Determines whether the application is healthy enough to handle requests.
+
+A heartbeat alone does not guarantee that the application's database or business APIs are functioning correctly.
+
+## 5. How Does Eureka Identify a Service Without a Hardcoded URL?
+
+Consider this Feign client in Order Service:
+
+```java
+@FeignClient(name = "ecom-inventory-service")
+public interface InventoryClient {
+
+    @GetMapping("/inventory/{productId}")
+    String getInventory(@PathVariable String productId);
+}
+```
+
+The name `ecom-inventory-service` must match the service's registered application name.
+
+For example, the Inventory Service has this configuration:
+
+```yaml
+spring:
+  application:
+    name: ecom-inventory-service
+
+server:
+  port: 8001
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+```
+
+When Inventory Service starts, it registers its instance information with Eureka.
+
+When Order Service calls the Feign method, the service name is resolved through Spring Cloud's discovery and load-balancing components.
+
+### Request flow
+
+`Feign → FeignBlockingLoadBalancerClient → Service Instance Selection → HTTP Request → Inventory Service`
+
+More precisely:
+
+1. **Feign:** Creates the HTTP request using the configured service name and endpoint path.
+2. **FeignBlockingLoadBalancerClient:** Integrates Feign with Spring Cloud LoadBalancer when the load-balancer integration is configured.
+3. **DiscoveryClient / Eureka client:** Provides registered instance information, commonly from the local registry cache.
+4. **LoadBalancer:** Selects an available instance.
+5. **URL resolution:** The service name is resolved to the selected instance's actual host and port.
+6. **HTTP request:** The request goes directly to that Inventory Service instance.
+7. **Response:** Inventory Service processes the request and returns the response to Order Service.
+
+Eureka does not proxy or redirect every HTTP request. It provides the service registry; the calling service sends the request to the selected instance.
+
+## 6. Important Interview Points
+
+- **Eureka Server:** Maintains the service registry.
+- **Eureka Client:** Registers its instance and obtains registry information.
+- **Service Registry:** Stores registered service-instance information.
+- **Local Cache:** Reduces the need to fetch registry information for every request.
+- **Heartbeat:** Renews the service instance's lease.
+- **Lease Expiration:** Allows stale instances to be removed after missed renewals, subject to eviction behavior.
+- **OpenFeign:** Makes declarative HTTP calls using a service name.
+- **Spring Cloud LoadBalancer:** Selects an instance from the discovered instances.
+- **Service Discovery:** Avoids hardcoding the target instance's host and port in each Feign client.
+
+**One-line interview answer:** Eureka maintains a registry of service instances, and Spring Cloud LoadBalancer uses discovery information to select an instance so that OpenFeign can call it without hardcoding its host and port.
+
