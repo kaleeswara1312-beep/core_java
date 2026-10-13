@@ -1,0 +1,1090 @@
+1. Java 17 features?
+2. Why default & static methods in Java 8?
+3. Stream vs Parallel Stream?
+4. Intermediate operation?
+5. "==" vs ".equals()"?
+6. Does HashMap allow null?
+7. Why String immutable?
+8. Stack vs Heap?
+9. Ways to create threads?
+10. ConcurrentModificationException?
+11. HashMap internally?
+12. Common annotations?
+13. Dependency Injection?
+14. Types of DI?
+15. Bean lifecycle?
+16. Controller vs RestController?
+17. "@Transactional"?
+18. PUT vs PATCH?
+19. "@Value"?
+20. Eager vs Lazy?
+21. Global exception handling?
+22. Spring Security?
+23. JWT?
+24. Saga?
+25. Circuit Breaker?
+
+1. Why is "String" immutable in Java?
+2. How does "HashMap" work internally?
+3. What happens when two keys have the same hashcode?
+4. Why must "equals()" and "hashCode()" follow a contract?
+5. "ArrayList" vs "LinkedList" — when would you use each?
+6. "HashMap" vs "ConcurrentHashMap" — what's the real difference?
+7. What happens if you modify a collection while iterating over it?
+8. "synchronized" vs "volatile" — when would you use each?
+9. How would you identify a deadlock in a Java application?
+10. "Runnable" vs "Callable" — when would you choose each?
+11. Why would you use "ExecutorService" instead of creating threads manually?
+12. What problem does "CompletableFuture" solve?
+13. How can a Java application have a memory leak despite having Garbage Collection?
+14. Heap vs Stack — what is stored where?
+15. What happens during a Full GC, and why can it affect API latency?
+16. What happens if an exception is thrown inside a thread?
+17. Why can "HashSet" detect duplicate objects incorrectly if "equals()" and "hashCode()" are implemented badly?
+18. When would you use "Optional", and when should you avoid it?
+19. Streams vs traditional loops — when would you prefer one over the other?
+20. Your Java API suddenly becomes slow in production. What JVM-level metrics would you check first?
+21. Your API suddenly becomes slow. How do you identify the bottleneck?
+22. Two requests create the same order at almost the same time. How do you prevent duplicates?
+23. A Kafka message is consumed twice. How do you make the consumer idempotent?
+24. One microservice goes down during checkout. What should happen to the overall workflow?
+25. Database queries are fast, but the API is slow. What else could be causing the latency?
+26. Your service works in staging but randomly fails in production. Where do you start?
+27. A payment succeeds, but Order Service doesn't receive the confirmation. How would you handle this?
+28. CPU is only 20%, but requests are timing out. What would you investigate?
+29. One service is receiving much more traffic than others. How would you handle it?
+30. Kafka consumer lag keeps increasing. What could be the reason?
+31. A database connection pool is exhausted while the database itself is healthy. Why?
+32. Adding more instances doesn't improve application performance. What could be the bottleneck?
+33. Users are seeing stale data even though the database has been updated. How would you debug it?
+34. A request travels through 6 microservices. How would you trace it end-to-end?
+35. An external API takes 20 seconds to respond. How would you protect your service?
+
+
+
+
+Here is the compiled list of all the interview questions, topics, and queries from the images, consolidated into a single clipboard format for easy copying.
+## 1. Top 25 Java Interview Coding Questions
+
+   1. Find duplicate elements in an array
+   2. Find first non-repeated character in String
+   3. Reverse a String without using inbuilt methods
+   4. Sort Employee list using Comparator & Streams
+   5. Find Top N highest salaries using Streams
+   6. Group Employees by Department using Streams
+   7. Convert List to Map using Streams
+   8. Remove duplicates using Streams
+   9. Find longest substring without repeating characters
+   10. Balanced Parentheses problem using Stack
+   11. Merge two sorted arrays
+   12. Implement LRU Cache
+   13. Producer Consumer problem
+   14. Deadlock example in Java
+   15. Thread-safe Singleton implementation
+   16. CompletableFuture real-time scenario
+   17. ConcurrentHashMap vs HashMap scenario
+   18. Retry failed REST API calls
+   19. Kafka duplicate message handling
+   20. Pagination implementation in Spring Boot
+   21. Rate Limiter implementation
+   22. Write Immutable class in Java
+   23. Count frequency of characters using HashMap
+   24. Difference between map() vs flatMap()
+   25. Comparable vs Comparator with examples
+
+------------------------------
+## 2. Top 10 SQL Questions
+
+   1. Find 2nd highest salary
+   2. Find nth highest salary
+   3. Remove duplicate records from table
+   4. Employees having same salary
+   5. Difference between WHERE and HAVING
+   6. INNER JOIN vs LEFT JOIN
+   7. Department-wise maximum salary query
+   8. Pagination using LIMIT & OFFSET
+   9. Find duplicate rows in table
+   10. Count employees department-wise
+
+------------------------------
+## 3. Most Repeated Topics
+
+* Java 8 Streams
+* Multithreading
+* Collections Internal Working
+* HashMap Internal
+* Spring Boot Exception Handling
+* Microservices Communication
+* Kafka
+* SQL Optimization
+* REST API Best Practices
+* JVM Memory Management
+
+------------------------------
+## 4. Virtusa Java Backend Interview Questions
+
+* Tell me about yourself
+* Explain your project & project architecture
+* System Design basics
+* String concepts & String Pool
+* How would you troubleshoot if a project suddenly stops working?
+* What is OutOfMemoryError & how would you resolve it?
+* How do you connect a Java application with a database?
+* What is Connection Pooling & how do you implement it?
+* What is Multithreading?
+* What is Spring MVC?
+* Spring vs Spring Boot
+* SQL Commands – DDL, DML, DQL, TCL, DCL
+* Oracle SQL queries
+* Joins, GROUP BY & HAVING
+* Exception Handling & Production Troubleshooting
+* REST API concepts
+* Microservices vs Monolithic Architecture
+* HashMap internal working
+* Java 8 Stream API & Lambda Expressions
+* @Transactional & Dependency Injection
+
+------------------------------
+## 5. Core Java, Streams, Multithreading & Spring Boot Questions (1–25)## Core Java
+
+   1. HashMap internal working. What happens when a bucket becomes a tree?
+   2. HashMap vs ConcurrentHashMap vs Hashtable.
+   3. "equals()" & "hashCode()" contract.
+   4. Why is String immutable?
+   5. Comparable vs Comparator.
+   6. Checked vs Unchecked Exceptions.
+   7. Can you override a static method?
+   8. What is try-with-resources?
+   9. Java 8, 11 & 17 features used in production.
+
+## Stream API
+
+   1. Find duplicate Strings using Streams.
+   2. "map()" vs "flatMap()".
+   3. Sort a Map by value.
+   4. What is Optional and where does it help?
+
+## Multithreading
+
+   1. Runnable vs Callable.
+   2. ExecutorService & thread pool sizing.
+   3. "synchronized" vs ReentrantLock.
+   4. "volatile" vs AtomicInteger.
+   5. Deadlock & how to detect it in a running JVM.
+
+## Spring Boot
+
+   1. Spring vs Spring Boot.
+   2. How does Auto-Configuration work?
+   3. Component vs Service vs Repository.
+   4. How does Dependency Injection resolve at startup?
+   5. "@Transactional" & rollback on checked exceptions.
+   6. ControllerAdvice & global exception handling.
+   7. Spring Security & JWT flow.
+
+------------------------------
+## 6. 50 Dangerous SQL Queries Every Data Engineer Should Know
+
+   1. DELETE FROM employees;
+   2. DELETE FROM orders WHERE 1=1;
+   3. DELETE FROM customers;
+   4. DELETE FROM transactions;
+   5. UPDATE employees SET salary = 0;
+   6. UPDATE users SET is_active = 'N';
+   7. UPDATE products SET price = 0;
+   8. UPDATE accounts SET balance = 0;
+   9. DROP TABLE employees;
+   10. DROP TABLE orders;
+   11. DROP DATABASE company_db;
+   12. TRUNCATE TABLE transactions;
+   13. TRUNCATE TABLE users;
+   14. ALTER TABLE customers DROP COLUMN email;
+   15. ALTER TABLE orders DROP COLUMN amount;
+   16. ALTER TABLE products MODIFY price VARCHAR(50);
+   17. ALTER TABLE users RENAME COLUMN ID TO temp_id;
+   18. ALTER TABLE large_table ADD COLUMN new_col;
+   19. ALTER TABLE large_table DROP PARTITION p2025;
+   20. ALTER TABLE large_table RENAME TO old_table;
+   21. SELECT * FROM huge_table;
+   22. SELECT DISTINCT * FROM billion_row_table;
+   23. SELECT COUNT(*) FROM huge_table;
+   24. SELECT * FROM logs ORDER BY event_time;
+   25. SELECT * FROM sales CROSS JOIN customers;
+   26. SELECT * FROM table1 CROSS JOIN table2 CROSS JOIN table3;
+   27. SELECT * FROM users WHERE UPPER(name) = 'JOHN';
+   28. SELECT * FROM orders WHERE YEAR(order_date) = 2025;
+   29. SELECT * FROM products WHERE CAST(price AS VARCHAR) = '100';
+   30. SELECT * FROM customers WHERE SUBSTRING(phone,1,3) = '999';
+   31. INSERT INTO target_table SELECT * FROM source_table;
+   32. INSERT INTO audit_table SELECT * FROM huge_table;
+   33. CREATE TABLE backup AS SELECT * FROM huge_table;
+   34. CREATE TABLE temp AS SELECT * FROM billion_row_table;
+   35. MERGE INTO target USING source;
+   36. MERGE INTO fact_sales USING stage_sales;
+   37. DROP INDEX idx_customer_id;
+   38. DROP INDEX idx_order_date;
+   39. CREATE INDEX idx_all_columns ON huge_table(...);
+   40. CREATE UNIQUE INDEX idx_bad ON duplicate_data(...);
+   41. GRANT ALL PRIVILEGES TO PUBLIC;
+   42. GRANT DBA TO reporting_user;
+   43. REVOKE ALL PRIVILEGES FROM admin_user;
+   44. COMMIT;
+   45. ROLLBACK;
+   46. LOCK TABLE employees IN EXCLUSIVE MODE;
+   47. LOCK TABLE orders IN EXCLUSIVE MODE;
+   48. VACUUM FULL large_table;
+   49. ANALYZE TABLE huge_table;
+   50. SHUTDOWN;
+
+
+Here is the compiled list of all 41 interview questions and the 29 sequential Java topics from your images, consolidated into a single clipboard format for easy copying.
+## Part 1: 41 Questions Worth Preparing (3-6 Years Experience)## 1. Core Java
+
+   1. HashMap internal working. What happens when a bucket becomes a tree?
+   2. HashMap vs ConcurrentHashMap vs Hashtable.
+   3. "equals()" & "hashCode()" contract.
+   4. Why is String immutable?
+   5. Comparable vs Comparator.
+   6. Checked vs Unchecked Exceptions.
+   7. Can you override a static method?
+   8. What is try-with-resources?
+   9. Java 8, 11 & 17 features used in production.
+
+## 2. Stream API
+
+   1. Find duplicate Strings using Streams.
+   2. "map()" vs "flatMap()".
+   3. Sort a Map by value.
+   4. What is Optional and where does it help?
+
+## 3. Multithreading
+
+   1. Runnable vs Callable.
+   2. ExecutorService & thread pool sizing.
+   3. "synchronized" vs ReentrantLock.
+   4. "volatile" vs AtomicInteger.
+   5. Deadlock & how to detect it in a running JVM.
+
+## 4. Spring Boot
+
+   1. Spring vs Spring Boot.
+   2. How does Auto-Configuration work?
+   3. Component vs Service vs Repository.
+   4. How does Dependency Injection resolve at startup?
+   5. "@Transactional" & rollback on checked exceptions.
+   6. ControllerAdvice & global exception handling.
+   7. Spring Security & JWT flow.
+
+## 5. Microservices
+
+   1. How do two services discover each other?
+   2. What does an API Gateway do?
+   3. Circuit Breaker & why retries can worsen an outage.
+   4. How do you trace a request across multiple services?
+
+## 6. SQL & Hibernate
+
+   1. When can an index hurt performance?
+   2. Find duplicate rows.
+   3. Find second-highest salary without "LIMIT".
+   4. What is the N+1 problem? How do you fix it?
+   5. Lazy vs Eager Loading.
+
+## 7. Coding Round
+
+   1. Move all zeroes to the end.
+   2. Check if two Strings are anagrams.
+   3. Find Longest Common Prefix.
+   4. Find missing number in an array.
+
+## 8. Managerial Round
+
+   1. Explain your project architecture end-to-end.
+   2. Tell me about a production bug you owned.
+   3. Notice Period & Relocation.
+
+------------------------------
+## Part 2: Core Java & Advanced Java Review Topics (Items 16–46)
+
+* 16. Access Modifiers (private, default, protected, public)
+* 17. Static Keyword (Variables, methods, and blocks belonging to the class)
+* 18. final Keyword (final variable, final method, final class)
+* 19. this and super Keyword (Referencing current object vs parent class members)
+* 20. Packages and Imports (Grouping related classes and managing access)
+* 21. Interfaces vs Abstract Classes (Comparing abstraction mechanisms and multiple inheritance rules)
+* 22. Method Overloading and Overriding (Compile-time vs runtime polymorphism)
+* 23. Anonymous Inner Class (Inner class without a name, used for event handling and functional interfaces)
+* 24. Enum in Java (Special classes to define constants with methods and constructors)
+* 25. Varargs (Variable Arguments) (Methods accepting 0 or more arguments treated as arrays)
+* 26. Serialization and Deserialization (Converting objects to byte streams and back)
+* 27. Singleton Design Pattern (Restricting class instantiation to only one object)
+* 28. Immutable Class (Creating unchangeable objects like String using final fields and copying mutable objects)
+* 29. Java Annotations (Metadata for compiler or runtime like @Override, @Deprecated, @SuppressWarnings)
+* 30. Functional Interfaces (Interfaces with exactly one abstract method annotated with @FunctionalInterface)
+* 31. Lambda Expressions (Introduced in Java 8 to make code concise and replace anonymous inner classes)
+* 32. Method References (Shorter syntax to refer to a method using ClassName::methodName)
+* 33. Streams API (Processing collections in a functional and pipeline style with filter, map, collect)
+* 34. Default and Static Methods in Interfaces (Adding method bodies inside interfaces from Java 8 onwards)
+* 35. JVM Architecture (Components: Class Loader, Memory Area, Execution Engine, Garbage Collector)
+* 36. Garbage Collection (Automatically removing unreferenced objects from memory using System.gc())
+* 37. JIT Compiler (Just-In-Time compiler compiling bytecode into native machine code at runtime)
+* 38. ClassLoader in Java (Loading classes into memory during runtime: Bootstrap, Extension, Application ClassLoader)
+* 39. Transient Keyword (Preventing specific object fields from being serialized)
+* 40. Volatile Keyword (Telling JVM that a variable may be changed by different threads to ensure visibility)
+* 41. Reflection API (Inspecting and modifying classes, methods, and fields at runtime)
+* 42. Java Memory Model (JMM) (Defining how threads interact through memory regarding visibility, ordering, and atomicity)
+* 43. Thread Lifecycle (Thread states managed by JVM: New, Runnable, Running, Blocked/Waiting, Terminated)
+* 44. Thread Safety and Synchronization (Using synchronized, ReentrantLock, and atomic classes to avoid race conditions)
+* 45. Executor Framework (Thread pool management and scheduling via ExecutorService)
+* 46. Java Generics (Writing type-safe, reusable code like List to eliminate type casting)
+
+Here is the compiled list of all the questions, real-world scenarios, and core topics extracted from the new set of images, organized for easy copying to your clipboard.
+## 1. Real-World & System Design Scenario Questions
+
+   1. How would you design an API that can handle 10K+ requests per second?
+   2. Your API is slow, but CPU and memory are normal. How would you find the bottleneck?
+   3. How would you prevent duplicate orders if the same request is received twice?
+   4. What happens when your database becomes unavailable for 30 seconds?
+   5. How would you design a retry mechanism without creating a retry storm?
+   6. One Microservice is down. How should dependent services behave?
+   7. How would you maintain consistency when a business operation spans multiple Microservices?
+   8. Kafka is receiving messages faster than consumers can process them. How would you solve it?
+   9. How would you handle a Kafka message that repeatedly fails?
+   10. Your database has 100 million records and a query suddenly becomes slow. How would you investigate?
+   11. How would you design pagination for millions of records?
+   12. Your Java application has high GC pauses in production. What would you investigate?
+   13. How would you prevent one slow downstream service from exhausting your application's threads?
+   14. How would you design an API so that it remains backward compatible when the response structure changes?
+   15. Your system works perfectly at normal traffic but fails during a sudden traffic spike. Walk me through your debugging approach.
+
+------------------------------
+## 2. Java Concurrency & Multithreading – Senior Interview Questions (1–31)## Core Concurrency
+
+   1. Process vs Thread – what is the difference?
+   2. What is the Java Memory Model (JMM)?
+   3. What is the happens-before relationship?
+   4. synchronized vs volatile?
+   5. synchronized method vs synchronized block?
+   6. What is a Race Condition?
+   7. How do you prevent Race Conditions?
+   8. What is Thread Safety?
+   9. What is Immutability and how does it help concurrency?
+   10. What is CAS (Compare-And-Swap)?
+
+## Locks & Synchronization
+
+   1. ReentrantLock vs synchronized?
+   2. ReentrantReadWriteLock vs ReentrantLock?
+   3. What is StampedLock?
+   4. What is a Deadlock?
+   5. How do you detect and prevent Deadlocks?
+   6. Deadlock vs Livelock vs Starvation?
+   7. What is Thread Starvation?
+   8. What is Lock Contention?
+   9. What is Lock-Free programming?
+   10. When would you use AtomicInteger instead of synchronized?
+
+## Executors & Thread Pools
+
+   1. How does ExecutorService work?
+   2. ThreadPoolExecutor – explain its core components.
+   3. Core Pool Size vs Maximum Pool Size?
+   4. What happens when the ThreadPoolExecutor queue is full?
+   5. FixedThreadPool vs CachedThreadPool?
+   6. What is ForkJoinPool?
+   7. How does Work Stealing work?
+   8. ExecutorService vs ForkJoinPool?
+   9. How do you size a thread pool for CPU-bound tasks?
+   10. How do you size a thread pool for I/O-bound tasks?
+
+## CompletableFuture
+
+   1. Future vs CompletableFuture?
+
+------------------------------
+## 3. Core & Advanced Java Notes – Review Topics (1–26)
+
+* 1. OOP Concepts (Encapsulation, Inheritance, Polymorphism, Abstraction)
+* 2. Data Types and Variables (Primitive vs Non-primitive, strongly typed, type casting)
+* 3. Control Flow Statements (if/if-else, switch, for/while/do-while, break/continue)
+* 4. Arrays and Strings (Fixed-size collection, String immutability, common String methods)
+* 5. Constructors (Initializing objects, overloading constructors, default constructors)
+* 6. Inheritance (Reusing code, child/parent class relationship, single/multilevel/hierarchical types, super keyword)
+* 7. Polymorphism (Compile-time overloading vs Runtime overriding, dynamic method dispatch)
+* 8. Abstraction (Hiding complex internal logic via abstract classes and interfaces)
+* 9. Encapsulation (Binding data and code via private fields and public getters/setters)
+* 10. Exception Handling (Gracefully handling runtime errors via try, catch, finally, throw, throws; Checked vs Unchecked)
+* 11. Multithreading (Concurrent execution, Thread class, Runnable interface, start/run/sleep/join methods, synchronization)
+* 12. Java Collections Framework (Storing and manipulating data; List, Set, Map; ArrayList, HashSet, HashMap)
+* 13. Wrapper Classes (Converting primitives to objects; Autoboxing and Unboxing)
+* 14. File Handling (I/O) (File, FileReader, BufferedReader, FileWriter, BufferedWriter; Handling exceptions)
+* 15. Java 8 Features (Lambda expressions, Stream API)
+* 16. Access Modifiers (private, default, protected, public)
+* 17. Static Keyword (Variables, methods, and blocks belonging to the class)
+* 18. final Keyword (final variable, final method, final class)
+* 19. this and super Keyword (Referencing current object vs parent class members)
+* 20. Packages and Imports (Grouping related classes, avoiding name conflicts)
+* 21. Interfaces vs Abstract Classes (Comparing abstraction mechanisms and inheritance rules)
+* 22. Method Overloading and Overriding (Compile-time vs runtime polymorphism, @Override annotation)
+* 23. Anonymous Inner Class (Inner class without a name, used for event handling and functional interfaces)
+* 24. Enum in Java (Special classes to define constants with methods and constructors)
+* 25. Varargs (Variable Arguments) (Methods accepting 0 or more arguments treated internally as arrays)
+* 26. Serialization and Deserialization (Converting objects to byte streams using ObjectOutputStream and ObjectInputStream)
+
+
+Here is the complete compiled list of all job requirements, technical interview questions, and real-world scenario topics extracted from this latest batch of images, organized perfectly into a single layout for easy clipboard copying.
+------------------------------
+## 1. Accenture Job Posting: Custom Software Engineer (SAP UI5)## Role Overview
+
+* Project Role: Custom Software Engineer
+* Experience Required: Minimum 5 years of experience in SAP UI5 Development
+* Location: Coimbatore Office
+* Educational Qualification: 15 years full-time education required
+
+## Professional & Technical Skills
+
+* Must-Have Skill: Proficiency in SAP UI5 Development
+* Core Skill: Strong understanding of JavaScript and HTML5
+* Design Principles: Experience with SAP Fiori design principles
+* Integration: Familiarity with RESTful APIs and OData services
+* Troubleshooting: Ability to troubleshoot and debug applications effectively
+
+## Roles & Responsibilities
+
+* Expected to be an SME (Subject Matter Expert).
+* Collaborate and manage the team to perform.
+* Responsible for team decisions.
+* Engage with multiple teams and contribute on key decisions.
+* Provide solutions to problems for their immediate team and across multiple teams.
+* Facilitate knowledge sharing sessions to enhance team capabilities.
+* Monitor project progress and ensure timely delivery of application features.
+
+------------------------------
+## 2. Java Concurrency, CompletableFuture, & Virtual Threads (Continuation Questions 25–50)## CompletableFuture
+
+   1. FixedThreadPool vs CachedThreadPool? (From previous set)
+   2. What is ForkJoinPool?
+   3. How does Work Stealing work?
+   4. ExecutorService vs ForkJoinPool?
+   5. How do you size a thread pool for CPU-bound tasks?
+   6. How do you size a thread pool for I/O-bound tasks?
+   7. Future vs CompletableFuture?
+   8. thenApply vs thenCompose?
+   9. thenCombine vs allOf?
+   10. How does CompletableFuture handle exceptions?
+   11. How do you implement timeout handling with CompletableFuture?
+   12. How do you control the Executor used by CompletableFuture?
+   13. What happens if CompletableFuture tasks block?
+   14. How would you design parallel API calls using CompletableFuture?
+
+## Virtual Threads
+
+   1. How do Virtual Threads work?
+   2. Virtual Threads vs Platform Threads?
+   3. When should you use Virtual Threads?
+   4. When should you NOT use Virtual Threads?
+   5. How do Virtual Threads handle blocking I/O?
+   6. Virtual Threads vs Thread Pool?
+   7. What are the limitations of Virtual Threads?
+
+## Real-World Production Scenarios
+
+   1. CPU usage suddenly reaches 100%. How would you identify the problematic threads?
+   2. Thread pool size is increasing but application throughput is decreasing. Why?
+   3. Application has thousands of blocked threads. How would you investigate?
+   4. Multiple requests are updating the same database record concurrently. How would you prevent inconsistent data?
+   5. A Java microservice becomes slow under high traffic. How would you determine whether the problem is thread contention, database connections, CPU, or external I/O?
+
+## Final Behavioral Question
+
+* Describe a production concurrency issue you have faced. How did you identify the root cause, what tools did you use, and how did you fix it?
+
+------------------------------
+## 3. Scenario-Based Questions for Senior Java Developer Roles (Amit Kushwaha List)
+
+   1. Suppose you have 3 microservices: A, B, and C. A posts a message to a Kafka topic of B. How does Microservice B consume the message and post it to the REST API endpoint of Microservice C?
+   2. How do we post a message to a REST API endpoint, and what is the difference between HttpClient and RestTemplate?
+   3. What is the difference between CrudRepository and JpaRepository?
+   4. What is the difference between SessionFactory and EntityManager?
+   5. In Spring JPA, what does it internally use: SessionFactory or EntityManager?
+   6. In Hibernate, what do we use: SessionFactory or EntityManager?
+   7. Suppose you consume a Kafka message in XML, convert it, and publish it to a downstream Kafka topic, but while doing this, the data is persisted in the database and the message is not published to the Kafka topic due to some error. How do you roll back the database data? How do you handle this scenario in a microservice?
+   8. How does Spring communicate with the database? How does Spring Data JPA do the same?
+   9. How do you control the number of users who can access your microservice? Suppose there are billions of users, but you want only 10K users to be able to access the service.
+   10. How do you store user details and passwords in AWS?
+   11. How does pagination work in Spring Boot? How does Spring Boot and the database know that only 10 records should be fetched and displayed at a time? Explain the internal working and flow from the Controller to the Service and Repository levels.
+   12. Suppose you have to design a flow where a message has to be put at a place from where 5 different microservices can read those messages asynchronously. Now, what approaches can we take here, and why?
+   13. How does Spring Boot decide which auto-configuration to apply?
+   14. What happens internally when you add the spring-boot-starter-web dependency?
+   15. Why does Spring Boot prefer convention over configuration?
+   16. What is the exact startup flow of a Spring Boot application?
+   17. What will happen if you define @Controller, @Service, and @Repository over the same class?
+   18. How does Spring Boot detect the embedded Tomcat and configure it?
+   19. How do we configure a health check in a Spring Boot application?
+   20. How do we make sure no external person can check or hit the health-check URL of your service? How do we secure it?
+   21. How does Spring Boot reduce XML configuration completely?
+   22. What is the role of SpringFactoriesLoader?
+   23. How does Spring Boot handle profile-specific configuration?
+   24. How does Spring Boot manage dependency versions internally?
+   25. How does Spring Boot handle externalized configuration?
+
+------------------------------
+## 4. Java Backend Interview Discussion Questions (25-Question Set)## Core Java / Advanced
+
+   1. Explain the difference between Comparable and Comparator. Which one is more flexible in real projects?
+   2. How does Garbage Collector decide which objects to clean? What is the difference between Minor GC & Major GC?
+   3. Why is String immutable in Java? What benefits does it give in multi-threaded environments?
+   4. How does ClassLoader work in Java? Can we have multiple classloaders in one JVM?
+   5. Difference between StringBuffer, StringBuilder, and normal String. Which one to use where?
+
+## Collections & Performance
+
+   1. How does CopyOnWriteArrayList work internally? When would you prefer it?
+   2. What is the difference between fail-fast and fail-safe iterators?
+   3. If you have millions of records to process, would you use Stream API or traditional loops? Why?
+   4. How does TreeMap maintain ordering? Can we provide custom sorting logic?
+   5. How do you find duplicates in a list using Java 8 features?
+
+## Spring & Spring Boot
+
+   1. What is the difference between @Transactional at class level vs method level?
+   2. Can you explain how Spring Boot auto-configuration works internally?
+   3. How do you configure multiple datasources in Spring Boot?
+   4. What's the difference between @RequestParam, @PathVariable, and @RequestBody?
+   5. How do you monitor and optimize Spring Boot applications in production?
+
+## Microservices & System Design
+
+   1. How do you implement distributed logging in microservices?
+   2. What's the difference between synchronous vs asynchronous communication in microservices?
+   3. How would you design a service to handle 1000+ requests per second?
+   4. How do you handle transactions that span across multiple microservices?
+   5. Can you explain the circuit breaker pattern? When have you used it?
+
+## Database & Real-time Scenarios
+
+   1. How do you implement pagination in SQL + Java?
+   2. If a query is taking 5 seconds, how would you debug & optimize it?
+   3. What's the difference between optimistic and pessimistic locking? Which one is better in microservices?
+   4. How do you implement caching in Spring Boot + DB to reduce load?
+   5. Real-world scenario: If one service keeps failing in production, how will you identify whether it's a code issue, infra issue, or DB issue?
+
+------------------------------
+## 5. Standard Core Questions Checklist## Top 25 Java Interview Coding Problems
+
+   1. Find duplicate elements in an array
+   2. Find first non-repeated character in String
+   3. Reverse a String without using inbuilt methods
+   4. Sort Employee list using Comparator & Streams
+   5. Find Top N highest salaries using Streams
+   6. Group Employees by Department using Streams
+   7. Convert List to Map using Streams
+   8. Remove duplicates using Streams
+   9. Find longest substring without repeating characters
+   10. Balanced Parentheses problem using Stack
+   11. Merge two sorted arrays
+   12. Implement LRU Cache
+   13. Producer Consumer problem
+   14. Deadlock example in Java
+   15. Thread-safe Singleton implementation
+   16. CompletableFuture real-time scenario
+   17. ConcurrentHashMap vs HashMap scenario
+   18. Retry failed REST API calls
+   19. Kafka duplicate message handling
+   20. Pagination implementation in Spring Boot
+   21. Rate Limiter implementation
+   22. Write Immutable class in Java
+   23. Count frequency of characters using HashMap
+   24. Difference between map() vs flatMap()
+   25. Comparable vs Comparator with examples
+
+## Top 10 SQL Questions
+
+   1. Find 2nd highest salary
+   2. Find nth highest salary
+   3. Remove duplicate records from table
+   4. Employees having same salary
+   5. Difference between WHERE and HAVING
+   6. INNER JOIN vs LEFT JOIN
+   7. Department-wise maximum salary query
+   8. Pagination using LIMIT & OFFSET
+   9. Find duplicate rows in table
+   10. Count employees department-wise
+
+Here is the complete compiled list of all the interview questions, production scenarios, system design problems, and study topics extracted from this new batch of images, organized into a single layout for easy clipboard copying.
+------------------------------
+## 1. Java Multithreading: 20 Tricky Interview Questions
+
+   1. What happens if a thread throws an exception while holding a synchronized lock?
+   2. Can a thread acquire the same synchronized lock multiple times? What does reentrant mean?
+   3. Why can double-checked locking fail without volatile?
+   4. What exactly does volatile guarantee under the Java Memory Model?
+   5. Can final fields help with thread safety? Why?
+   6. What is a happens-before relationship in Java?
+   7. Does calling Thread.start() establish a happens-before relationship? What about Thread.join()?
+   8. Why is HashMap unsafe for concurrent modifications, and when would you use ConcurrentHashMap?
+   9. How does ConcurrentHashMap achieve concurrency without locking the entire map?
+   10. Why does ConcurrentHashMap not allow null keys or values?
+   11. What is the difference between AtomicInteger and LongAdder under heavy contention?
+   12. Why can CopyOnWriteArrayList be faster for reads but expensive for writes?
+   13. What is the difference between CountDownLatch and CyclicBarrier?
+   14. When would you use Semaphore instead of a lock?
+   15. What happens if a bounded BlockingQueue becomes full?
+   16. What is backpressure, and how can a thread pool provide it?
+   17. Why can an unbounded executor queue hide a production performance problem?
+   18. What happens if tasks submitted to a thread pool submit additional tasks to the same small pool and then wait for them?
+   19. How can CompletableFuture chains accidentally execute on the wrong thread pool?
+   20. Production Scenario: Your application has 500 concurrent requests, 200 worker threads, CPU at 20%, and hundreds of threads in WAITING or BLOCKED. What would you investigate first, and how would you prove the bottleneck?
+
+## Interviewer Trap Highlighted in the Text:
+
+* Q: If a method is synchronized, is the entire object thread-safe?
+* A: No. Synchronizing individual methods only protects the operations covered by that particular lock. Thread safety depends on the entire shared-state design. For example, exposing a mutable field directly (e.g., returning a mutable List inside a getter) allows unsafe access because callers can modify the collection without acquiring the object's lock.
+
+------------------------------
+## 2. Top 25 Java Backend Production Scenario Interview Questions## Performance and Latency
+
+   1. API latency jumps from 200 ms to 5 seconds. Where do you investigate first?
+   2. Works at 100 users but fails at 10,000. What is the bottleneck?
+   3. CPU is normal, but latency is high. What could be happening?
+   4. How do you identify whether the issue is in code, DB, network, or downstream service?
+   5. A query is fast in dev but takes 10 seconds in production. Why?
+   6. Memory usage grows for days, then the app crashes. How do you find the leak?
+
+## Resilience and Failure
+
+   1. A downstream service becomes slow. How do you prevent cascading failure?
+   2. When should you use Circuit Breaker, Retry, Timeout, and Bulkhead?
+   3. Your DB connection pool is exhausted in production. What are the likely causes?
+   4. Redis goes down. Should your application fail too? Design the fallback.
+   5. How do you handle cache invalidation across multiple application instances?
+
+## Idempotency and Consistency
+
+   1. A user double-clicks Pay and retries occur. How do you prevent duplicate charges?
+   2. Where do you store the idempotency key, and how do you handle concurrent requests with the same key?
+   3. A network retry sends the same request twice. How do you ensure the same result?
+   4. A transaction spans multiple microservices. How do you maintain consistency?
+   5. When do you use Saga, and how do you handle a failed compensation step?
+
+## Kafka and Messaging
+
+   1. When should you choose synchronous calls over asynchronous messaging?
+   2. A consumer crashes after processing a message but before committing the offset. What happens?
+   3. How do you prevent duplicate processing of the same Kafka event?
+
+## Kubernetes and Deployment
+
+   1. A pod keeps restarting, but application logs show nothing. How do you debug it?
+   2. How do you deploy a new Spring Boot version with zero downtime?
+   3. A pod is terminating. What happens to in-flight requests, and how do you ensure graceful shutdown?
+
+## Scale and Data
+
+   1. Design rate limiting for an API serving millions of users.
+   2. How do you process a 5 GB CSV without causing OutOfMemoryError?
+   3. A bug appears only under heavy traffic, never locally. How do you reproduce and diagnose it?
+
+------------------------------
+## 3. Spring Memory Leak Infographic Analysis Checklist## Core Concept
+
+* A memory leak occurs when objects are no longer needed but are still referenced. The JVM cannot reclaim this memory, leading to increased usage and eventual OutOfMemoryError.
+
+## Common Causes, Examples, & Solutions
+
+* Unclosed Resources: Database connections, file streams, or sessions left open.
+* Solution: Always close in finally blocks or use try-with-resources.
+* Static References: Static collections (like a static List) holding onto large objects.
+* Solution: Avoid static collections where possible; clear them when not needed.
+* Event Listeners: Listeners that are registered but not removed after use.
+* Solution: Explicitly remove listeners when the associated component is destroyed.
+* Cache Without Bounds: Unbounded Maps or Caches that grow indefinitely.
+* Solution: Set a maximum cache size or implement an eviction policy (e.g., LRU).
+* Inner Class Leak: Non-static inner classes declared inside a static context, preventing the outer class from being garbage collected.
+* Solution: Use static inner classes or remove long-lived explicit references.
+
+------------------------------
+## 4. 20 Crazy System Design Questions That Can Break a Senior Interview
+
+   1. Your system is 99.99% available, but customers still complain about downtime. How is that possible?
+   2. Redis is faster than your database. Why could removing Redis actually make your system more reliable?
+   3. Kafka guarantees message durability. Can you still lose a message?
+   4. Your database has plenty of CPU and memory, but response time suddenly jumps from 50ms to 5 seconds. What could be happening?
+   5. You have exactly-once processing. Why can users still see duplicate payments?
+   6. Your load balancer is working perfectly, but one server receives 80% of the traffic. Why?
+   7. You increased your service instances from 10 to 100, but throughput barely changed. What’s your bottleneck?
+   8. Your cache hit rate is 99%. Why can your database still be overloaded?
+   9. A request succeeds, but the client never receives the response and retries it. How do you prevent duplicate operations?
+   10. Your database replication lag is 30 seconds. Should you stop sending traffic to replicas?
+   11. Your system has no single point of failure, yet the entire system goes down. What could cause it?
+   12. You added retries to make your system more resilient, and suddenly the outage became 10x worse. Why?
+   13. Two services each report “success,” but the final business operation failed. How would you recover?
+   14. Your distributed lock expires while the first process is still working. What happens next?
+   15. You increased Kafka partitions and performance became worse. Why could that happen?
+   16. Your API latency is excellent at the 95th percentile but terrible at p99. What does that tell you?
+   17. You scaled horizontally, but your application became slower. What hidden shared resource could be limiting you?
+   18. Your database is strongly consistent, but users still see stale data. How?
+   19. Everything works perfectly in testing, but production randomly fails once every few hours. How would you design the system to find the problem?
+   20. Your architecture has zero downtime deployments—yet deployment still causes customer-visible failures. How?
+
+------------------------------
+## 5. Top 30 Spring Boot Questions & Answers Checklist (2026 Core Sheet)
+
+   1. What is Spring Boot and what are its key features?
+   2. How does Spring Boot simplify Spring application development?
+   3. Explain the concept of Starter Dependencies in Spring Boot.
+   4. What is Spring Boot Auto-Configuration? How does it work?
+   5. What is the difference between @SpringBootApplication and @Configuration?
+   6. Explain the role of application.properties and application.yml in Spring Boot.
+   7. How do you create and expose a RESTful API in Spring Boot?
+   8. What is the difference between @PathVariable and @RequestParam?
+   9. How do you handle exceptions in Spring Boot?
+   10. What is @ControllerAdvice and how is it useful?
+   11. How do you validate input in Spring Boot?
+   12. Explain Spring Boot Actuator and its important endpoints.
+   13. How do you secure a Spring Boot application using Spring Security?
+   14. What is JWT and how can it be implemented in Spring Boot?
+   15. How do you implement role-based authorization in Spring Boot?
+   16. What is the difference between a filter and an interceptor in Spring Boot?
+   17. How do you connect a Spring Boot application to a database?
+   18. Explain Spring Data JPA and its benefits.
+   19. What is the difference between @Entity and @Table?
+   20. How do you handle database transactions in Spring Boot?
+   21. What is the purpose of @Service, @Repository, and @Component?
+   22. How do you configure CORS in Spring Boot?
+   23. What is Swagger / OpenAPI and how do you implement it?
+   24. How do you schedule tasks in Spring Boot?
+   25. What is Spring Boot Cache and how does it work?
+   26. How do you upload and download files in Spring Boot?
+   27. Explain logging in Spring Boot.
+   28. How do you externalize configuration in Spring Boot?
+   29. What is the difference between @MockBean and @SpyBean?
+   30. How do you build and deploy a Spring Boot application?
+
+------------------------------
+## 6. HCL Interview Experience Checklist (3 YOE Java Backend Developer)## Round 1 – Online Assessment (Coding Round)
+
+* Coding Question: Given an unsorted ArrayList, remove duplicates and print the result using only streams.
+* Key Lesson From Candidate: Always double-check your imports, even for logic you are confident about!
+
+## Round 2 – Technical Interview Topics
+
+* Interviewer Style: Line-by-line resume walkthrough. Almost every "difference between X and Y" question was immediately followed up with a practical question: "When would you use it?"
+
+## Core Java Core Focus Areas
+
+   1. Java 8, 17, and 21 features.
+   2. Functional interfaces and their methods.
+   3. Why we use lambda expressions.
+   4. Can we use lambda expressions without a functional interface? (Answer: No—lambdas rely on functional interfaces to provide the target type/context).
+   5. Abstract class vs Interface.
+
+## OOP & Design Principles
+
+   1. SOLID principles.
+   2. ACID properties (databases).
+
+## Hibernate / JPA
+
+   1. Entity relationships — one-to-one, one-to-many, and many-to-many mappings.
+   2. Difference between one-to-many and many-to-many relationships, and when to use each.
+   3. Common JPA methods.
+
+## Spring / Spring Boot
+
+   1. Spring Bean lifecycle.
+   2. Commonly used annotations in Spring Boot.
+   3. @RequestMapping vs @PathVariable — difference and use case.
+   4. Why and when we use @RequestMapping.
+
+## Microservices & Communication
+
+   1. Core components of microservices architecture.
+   2. Role of an API Gateway.
+   3. Inter-service communication — how data transfer happens between two services.
+   4. Difference between synchronous and asynchronous communication, and when to use each.
+   5. Exception handling strategies.
+   6. Explaining the overall application flow end-to-end.
+
+## Security
+
+   1. JWT flow in your project & how JWT is generated, used, and where it's stored.
+
+## Database
+
+   1. Schema design — specific questions regarding schemas used in your current project.
+
+## Cloud & Deployment
+
+   1. AWS services used for deployment.
+   2. Which specific services you have hands-on experience with.
+
+## Monitoring & Debugging
+
+   1. How to trace and monitor logs when an error occurs in production.
+   2. Your structured approach to identifying the root cause of a production issue.
+
+Here is the complete compiled list of all technical interview questions, system design problems, design pattern scenarios, and debugging topics extracted from this latest batch of images, formatted into a single cohesive format for easy clipboard copying.
+------------------------------
+## 1. IBM Senior Software Engineer Prep List (Questions 1–49)## Java
+
+   1. How do Virtual Threads work internally, and when should you avoid using them?
+   2. How does ConcurrentHashMap achieve thread safety?
+   3. How would you troubleshoot a Java application with 100% CPU usage?
+   4. How would you identify and fix a JVM memory leak?
+   5. G1 GC vs ZGC – when would you choose each?
+   6. How does CompletableFuture handle asynchronous execution?
+   7. What causes thread pool exhaustion in a Java application?
+   8. How would you design a thread-safe cache in Java?
+   9. How does the Java Memory Model handle visibility and ordering?
+   10. How would you profile a production JVM without restarting the application?
+
+## Spring Boot
+
+   1. How does Spring Boot Auto-Configuration work internally?
+   2. How does @Transactional work internally?
+   3. Why does @Transactional sometimes not work?
+   4. How would you optimize a slow Spring Boot REST API?
+   5. How would you handle global exception handling in a microservice?
+   6. How does Spring Boot manage database connections?
+   7. How would you configure and tune HikariCP?
+   8. How would you implement caching in Spring Boot?
+   9. How do you secure a Spring Boot microservice?
+   10. How would you gracefully shut down a Spring Boot application?
+
+## Microservices
+
+   1. How would you design a fault-tolerant microservices architecture?
+   2. How do you prevent cascading failures?
+   3. Circuit Breaker vs Retry – when should each be used?
+   4. How would you implement distributed transactions?
+   5. Saga Choreography vs Orchestration?
+   6. How would you implement idempotency in REST APIs?
+   7. How would you handle service-to-service communication failures?
+   8. How would you design API versioning for microservices?
+   9. How would you troubleshoot a slow downstream microservice? (Note: Number 29 skipped in original text)
+
+## Kubernetes
+
+   1. What happens when a Kubernetes Pod crashes?
+   2. Readiness Probe vs Liveness Probe?
+   3. Deployment vs StatefulSet?
+   4. How does Kubernetes Service Discovery work?
+   5. How does HPA scale a Spring Boot application?
+   6. How would you troubleshoot a Pod stuck in CrashLoopBackOff?
+   7. How do you manage configuration and secrets in Kubernetes? (Note: Number 37 skipped in original text)
+   8. How would you troubleshoot high CPU or memory usage inside a Pod?
+   9. How would you configure JVM memory limits for Java applications running in Kubernetes?
+
+## AWS
+
+   1. EC2 vs ECS vs EKS vs Lambda – when would you choose each?
+   2. SQS vs SNS – when should you use each?
+   3. RDS vs DynamoDB for a Spring Boot application?
+   4. How would you design a highly available Java application on AWS?
+   5. How would you secure a Spring Boot application running on AWS?
+
+## Observability & Production
+
+   1. Metrics vs Logs vs Distributed Traces?
+   2. How do Micrometer and OpenTelemetry work with Spring Boot?
+   3. How would you investigate an API whose latency suddenly increased from 200ms to 5 seconds?
+   4. How would you identify whether the problem is in Java, Kubernetes, database, or AWS infrastructure?
+
+------------------------------
+## 2. Optum Focus Interview Masterclass (Questions 1–35)## Core Java (OOPs, Collections, Concurrency Basics)
+
+   1. Explain difference between HashMap, LinkedHashMap and TreeMap.
+   2. How do you handle thread safety in Java Collections? (Collections.synchronizedXXX vs Concurrent Collections)
+   3. Explain immutability in Java and how to create immutable classes.
+   4. How do you implement Producer-Consumer in Java?
+   5. Explain difference between ExecutorService, ForkJoinPool and CompletableFuture.
+
+## Spring & Spring Boot
+
+   1. Difference between @Controller, @RestController and @ControllerAdvice.
+   2. How do you implement global exception handling in Spring Boot?
+   3. How do you configure multiple data sources in a Spring Boot application?
+   4. How to secure REST APIs using JWT or OAuth2 in Spring Boot?
+   5. How do you implement caching in Spring Boot (Redis / Caffeine)?
+
+## JPA / Hibernate
+
+   1. Difference between save(), persist(), and merge().
+   2. Explain lazy loading vs eager loading — how to avoid LazyInitializationException.
+   3. How do you implement batch inserts/updates in Hibernate for large datasets?
+   4. Explain @OneToOne, @OneToMany, and @ManyToMany mappings with examples.
+   5. What are entity states (transient, persistent, detached, removed) in Hibernate?
+
+## Microservices & Architecture
+
+   1. Difference between synchronous and asynchronous communication between services.
+   2. How do you implement service discovery and configuration management?
+   3. Explain the use of message brokers (Kafka/RabbitMQ) in microservices.
+   4. How do you design a fault-tolerant API Gateway?
+   5. Explain circuit breaker and retry patterns in microservices.
+
+## Cloud & DevOps Basics (Optum Focus)
+
+   1. How do you deploy Spring Boot microservices to cloud platforms (AWS/Azure)?
+   2. Explain CI/CD pipeline steps in your project (Jenkins/GitLab CI).
+   3. How do you secure secrets and environment variables in cloud?
+   4. Explain vertical vs horizontal scaling with real examples.
+   5. How do you monitor and trace microservices in production (ELK, Prometheus, Zipkin)?
+
+## SQL / Database Knowledge
+
+   1. Write a SQL query to fetch the 3rd highest salary from Employee table.
+   2. Difference between INNER JOIN and LEFT JOIN; give a real use case.
+   3. How do you implement data partitioning/sharding for large tables?
+   4. Explain database indexing and its impact on performance.
+   5. How do you handle transactions and isolation levels in healthcare systems?
+
+## DSA & Coding (Optum Special Focus)
+
+   1. Implement a Java program to group patients by insurance plan and count them.
+   2. Write a Java program to find duplicate records in a large data stream.
+   3. Implement a REST endpoint to fetch the last 10 activities of a user.
+   4. Design a system to send healthcare alerts to millions of users in real time.
+   5. Implement a thread-safe cache with expiration policy in Java.
+
+------------------------------
+## 3. Product-Based Interview Follow-Up Scenarios (1–15)
+
+   1. What if the failure happens after the database transaction commits?
+   2. What if the client retries the same request?
+   3. What if the downstream service is unavailable?
+   4. When should you retry, and when should you fail fast?
+   5. How would you prevent a retry storm?
+   6. What if the request succeeds but the response never reaches the client?
+   7. How would you make the API idempotent?
+   8. What if two requests arrive at exactly the same time?
+   9. How would you trace the request across multiple services?
+   10. What metrics would you check during the incident?
+   11. How would you prevent one failing service from causing cascading failures?
+   12. What if your database is temporarily unavailable?
+   13. How would you recover messages that failed processing?
+   14. How would you deploy a fix without causing another outage?
+   15. After fixing the issue, how would you make sure it doesn't happen again?
+
+------------------------------
+## 4. Top 50 Java Backend Debugging & Production Questions
+
+   1. API is slow in production — where do you start debugging?
+   2. High CPU usage after deployment — what will you check?
+   3. Memory usage keeps increasing — possible causes?
+   4. How do you identify memory leaks in Java?
+   5. How do you analyze heap dump?
+   6. How do you analyze thread dump?
+   7. What if DB queries suddenly become slow?
+   8. How do you identify missing indexes?
+   9. How to debug connection pool exhaustion?
+   10. What happens if thread pool is exhausted?
+   11. How do you handle high latency in APIs?
+   12. What if one microservice is slowing entire system?
+   13. How to debug timeout issues?
+   14. How do you handle cascading failures?
+   15. What is circuit breaker real use case?
+   16. How do you debug Kafka consumer lag?
+   17. What if messages are duplicated?
+   18. How to handle idempotency in retries?
+   19. What if logs are not sufficient?
+   20. How to improve observability?
+   21. How do you implement distributed tracing?
+   22. What metrics do you monitor in production?
+   23. How to detect slow endpoints?
+   24. What is p95 vs p99 latency?
+   25. How to debug GC pauses?
+   26. What causes OutOfMemoryError?
+   27. How to fix memory fragmentation?
+   28. How to handle traffic spikes?
+   29. How to scale application quickly?
+   30. What is autoscaling strategy?
+   31. What if deployment breaks production?
+   32. How do you rollback safely?
+   33. What is blue-green deployment?
+   34. How to validate canary release?
+   35. How to handle config issues in prod?
+   36. What if cache is not working?
+   37. Cache miss vs cache stampede?
+   38. How to debug Redis issues?
+   39. How to prevent stale cache?
+   40. How to debug authentication failures?
+   41. What if JWT expires frequently?
+   42. How to debug CORS issues?
+   43. How to debug network latency?
+   44. What if third-party API fails?
+   45. How to design fallback mechanism?
+   46. How to implement retry with backoff?
+   47. What if disk space is full?
+   48. How to monitor logs efficiently?
+   49. What tools do you use for debugging?
+   50. Biggest production issue you handled?
+
+------------------------------
+## 5. Real-World Design Pattern Problem Scenarios (1–20)
+
+   1. Your payment service supports UPI, Credit Card, Debit Card, and Net Banking. New payment methods will be added frequently. Which pattern would you use?
+   2. Your application creates Email, SMS, and Push notifications based on business rules. How would you design object creation? Which pattern fits?
+   3. Customers can have Regular, Premium, and Enterprise pricing strategies. The pricing algorithm can change at runtime. Which pattern fits?
+   4. Your request passes through 10+ validation steps, and different clients need different validation chains. Which pattern would you choose?
+   5. Your service integrates with multiple third-party payment providers, each exposing a different API. How would you hide those differences?
+   6. You need to generate reports in PDF, Excel, CSV, and JSON, with different construction steps for each format. Which pattern would you consider?
+   7. An Order has 20 optional fields. How would you create it without a constructor containing 20 parameters?
+   8. When an order is created, multiple components must react: inventory, email, analytics, and notifications. Which pattern fits?
+   9. A legacy API doesn't match your application's interface. How would you integrate it without changing the legacy code?
+   10. Multiple database implementations exist, and the implementation must be selected at runtime. Which pattern would you consider?
+   11. You need exactly one instance of a component, but it must remain safe against multithreading, serialization, and reflection issues. How would you design it?
+   12. You need to add logging, metrics, caching, and authorization around an existing service without modifying its core logic. Which pattern fits?
+   13. Both Shape and RenderingEngine can vary independently. How would you avoid creating a large number of subclasses?
+   14. Your application has File and Directory objects that should be treated uniformly. Which pattern would you use?
+   15. You need to traverse a complex object structure without exposing its internal representation. Which pattern would you consider?
+   16. Different business rules execute based on request type, and new rules are added frequently. How would you avoid a huge if-else block?
+   17. A request moves through multiple processing stages, and each stage can either handle it or pass it forward. Which pattern fits?
+   18. Users need to undo changes and restore previous object states. Which pattern would you use?
+   19. A legacy system exposes a complicated API, but your application needs only a simple interface for common operations. Which pattern would simplify it?
+   20. Your OrderService has grown to handle validation, payment, inventory, notifications, and persistence. Which design patterns would you combine to refactor it, and why?
+
+------------------------------
+## 6. SQL Query Lifecycle Phases (Reference Architecture)
+
+   1. Parser: Validates raw SQL syntax.
+   2. Semantic Analyzer: Checks the existence of database elements (tables, columns, permissions, and matching data types).
+   3. Optimizer: Generates the plan to execute that query in the most efficient manner (the execution planner).
+   4. Execution Engine: Executes the generated plan while interacting natively with the storage engine.
+   5. Storage Engine: Reads from Disk / Buffer Cache to fetch target records.
+   6. Client: Rows are systematically returned back to the user client interface (psql, DBeaver, pgAdmin, App Layer).
+
+
+Here is the compiled list of interview questions from both images, ready to be copied to your clipboard.
+## 1. 5 Java Interview Questions for a Senior Java Developer / Architect
+
+   1. Concurrency: When would you use synchronized, ReentrantLock, ConcurrentHashMap, or atomic operations?
+   2. JVM Troubleshooting: Your service has high CPU and long GC pauses. How would you investigate?
+   3. Async Programming: 5 downstream calls must complete within a 2-second SLA. How would you design it?
+   4. HashMap vs ConcurrentHashMap: Why can HashMap be problematic in concurrent applications?
+   5. Retry Storms: Retries are causing your system to overload. What happened and how do you fix it?
+
+------------------------------
+## 2. Deep-Dive Spring Boot Questions (1–20)
+
+   1. A bean is successfully created, but Spring injects a proxy instead of the actual object. Why?
+   2. Why can @Transactional behave differently when a method is private, final, or called through this?
+   3. What happens if a bean throws an exception during @PostConstruct?
+   4. Why can @Lazy fix a startup problem but introduce a runtime failure later?
+   5. What happens if two Spring beans have the same name but different implementations?
+   6. Why can changing the order of Spring configuration classes change application behavior?
+   7. What happens if an ApplicationEvent listener throws an exception?
+   8. When would you use @EventListener versus @TransactionalEventListener?
+   9. Why can an event published inside a transaction be processed even when the transaction eventually rolls back?
+   10. What happens when @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT) is used but the transaction never commits?
+   11. Why can Spring's default singleton scope still result in multiple instances of a bean?
+   12. What happens if a request-scoped bean is injected into a singleton?
+   13. Why does Spring use scoped proxies for request/session-scoped dependencies?
+   14. What happens when a configuration property is missing but the application uses @Value("${some.property}")?
+   15. Why can @ConfigurationProperties be safer than using dozens of @Value fields?
+   16. What happens if two @Scheduled methods trigger at exactly the same time?
+   17. Why can a scheduled Spring job execute multiple times in a distributed deployment?
+   18. Your application has 5 pods and a @Scheduled job. Will the job run once or five times?
+   19. Why can graceful shutdown still leave some requests or background tasks incomplete?
+   20. Your Spring Boot application starts successfully, but the first API request fails because a required external service is unavailable. How would you design startup and dependency checks?
