@@ -34,7 +34,7 @@ Microservices communicate with one another in two main ways.
 
 In synchronous communication, one service sends a request to another service and waits for its response.
 
-It commonly uses REST APIs with clients such as `RestClient` or `WebClient` (when used in a blocking manner).
+It commonly uses REST APIs with clients such as `RestClient` or `WebClient` (when used in a non blocking manner).
 
 **Real-time example: E-commerce Order**
 
@@ -1218,3 +1218,459 @@ The ThreadPool Bulkhead runs the protected method on its dedicated executor. Its
 
 **Final takeaway:** An API Gateway manages client entry and routing, while resilience patterns protect service-to-service calls and resource usage. They complement one another but solve different problems.
 
+# Saga Pattern in Microservices
+
+## 1. What Is the Saga Pattern?
+
+**Definition:** The Saga Pattern manages a business transaction across multiple microservices by splitting it into a sequence of local transactions, each with a corresponding compensating action if a later step fails.
+
+## 2. Why Do We Need It?
+
+In microservices, each service usually manages its own database. A single ACID transaction across all services is generally not practical.
+
+**Example:** Placing an order requires:
+1. Order Service creates an order.
+2. Payment Service processes payment.
+3. Inventory Service reserves stock.
+
+If inventory reservation fails after payment succeeds, the system must handle the payment and order consistently.
+
+**Without Saga:** One service may complete its transaction while another fails, leaving inconsistent business state.
+
+**With Saga:** The system executes compensating actions to undo or offset previously completed steps.
+
+## 3. Example Flow
+
+**Successful transaction**
+
+```text
+Create Order
+    |
+    v
+Process Payment
+    |
+    v
+Reserve Inventory
+    |
+    v
+Order Confirmed
+```
+
+**Failure and compensation**
+
+```text
+Create Order          SUCCESS
+    |
+    v
+Process Payment       SUCCESS
+    |
+    v
+Reserve Inventory     FAILED
+    |
+    v
+Refund Payment        COMPENSATION
+    |
+    v
+Cancel Order          COMPENSATION
+```
+
+Compensation is a new business operation, not necessarily a literal database rollback.
+
+## 4. Two Saga Implementation Approaches
+
+### A. Choreography
+
+**Definition:** Services coordinate through events without a central controller.
+
+**Example:**
+- Order Service publishes `OrderCreated`.
+- Payment Service processes payment and publishes `PaymentCompleted`.
+- Inventory Service reserves stock and publishes `InventoryReserved`.
+- If inventory fails, events trigger payment refund and order cancellation.
+
+**Suitable for:** Smaller workflows with a limited number of services.
+
+### B. Orchestration
+
+**Definition:** A central orchestrator controls the workflow and tells each service which operation to perform.
+
+**Example:**
+
+```text
+Saga Orchestrator
+    |
+    +--> Order Service: Create Order
+    |
+    +--> Payment Service: Process Payment
+    |
+    +--> Inventory Service: Reserve Stock
+                     |
+                     +--> Failure
+                            |
+                            v
+                     Refund Payment
+                            |
+                            v
+                     Cancel Order
+```
+
+**Suitable for:** Complex workflows with multiple steps, conditional decisions, and compensating actions.
+
+## 5. How to Implement Saga in Java
+
+You can implement Saga using Spring Boot with either event-driven messaging or a workflow orchestrator.
+
+| Technology | Purpose |
+|---|---|
+| Spring Boot | Build microservices and REST APIs |
+| Apache Kafka or RabbitMQ | Exchange events between services |
+| Spring Kafka or Spring AMQP | Integrate messaging with Spring |
+| Orchestration framework (optional) | Manage workflow steps and compensation |
+
+### Example using Spring Boot and Kafka
+
+1. Order Service creates an order and publishes `OrderCreated`.
+2. Payment Service consumes the event and processes payment.
+3. Payment Service publishes `PaymentCompleted` or `PaymentFailed`.
+4. Inventory Service reserves stock after payment succeeds.
+5. If inventory reservation fails, the workflow triggers `RefundPayment` and `CancelOrder`.
+
+Each service commits its own local database transaction.
+
+## 6. Which Package Should We Use?
+
+There is no single mandatory Java package for the Saga Pattern.
+
+- **For learning or a simple implementation:** Spring Boot + Spring Kafka or Spring AMQP.
+- **For a complex orchestrated workflow:** Consider Temporal's Java SDK or a suitable workflow orchestration framework.
+- **For event-driven choreography:** Use Kafka or RabbitMQ with Spring's messaging integration.
+
+Typical Maven dependencies for a Kafka-based implementation:
+
+```xml
+<dependency>
+    <groupId>org.springframework.kafka</groupId>
+    <artifactId>spring-kafka</artifactId>
+</dependency>
+```
+
+Use a compatible Spring Boot and Spring Kafka version.
+
+## 7. Important Best Practices
+
+- Make event processing idempotent to avoid duplicate operations.
+- Use retries for transient failures.
+- Implement compensating transactions for completed steps.
+- Handle duplicate and out-of-order events.
+- Consider the transactional outbox pattern to reliably publish events alongside database changes.
+- Monitor workflow status and provide recovery for failed compensations.
+
+## Summary
+
+**Saga Pattern = Local transactions + Coordination + Compensating actions.**
+
+It helps maintain business consistency across multiple microservices without requiring one distributed database transaction.
+
+
+# Idempotency in Microservices
+
+## Definition
+Idempotency means executing the same operation multiple times produces the same final business result as executing it once.
+
+## When Does It Happen?
+Duplicate requests can occur when the original request succeeds but the client does not receive the response, leaving the operation's outcome uncertain.
+
+## Ways Duplicate Requests Can Happen
+1. **Network Timeout:** Backend completes the operation, but the response is lost.
+2. **Frontend Retry:** Frontend retries a request after a timeout or network failure.
+3. **Multiple Button Clicks:** User clicks Submit, Pay, or Place Order multiple times.
+4. **API Gateway/HTTP Client Retry:** Configured gateways or clients resend requests after certain failures.
+5. **Service Crash:** Service commits a database transaction but crashes before responding or acknowledging.
+6. **Kafka/RabbitMQ Redelivery:** Consumer processes a message but fails before acknowledgment, so the broker delivers it again.
+7. **Saga Retry:** A microservice workflow retries a previously executed step after a failure.
+8. **Browser Refresh/Resubmission:** User reloads the page or resubmits an operation whose outcome is unknown.
+
+## How to Prevent Duplicate Business Operations
+1. **Idempotency Key:** Assign a unique key to each logical operation and reuse the same key for every retry.
+2. **Database Unique Constraint:** Enforce uniqueness on the idempotency key within the appropriate scope.
+3. **Store Operation Status:** Persist the key, request hash, status, and result/resource ID.
+4. **Safe Concurrency Handling:** Ensure simultaneous requests with the same key cannot both execute the business operation.
+5. **Frontend Protection:** Disable submit buttons while processing, but do not rely on this alone.
+6. **Retry Policy:** Retry only appropriate failures, use backoff where needed, and preserve the original key.
+7. **Message Deduplication:** Use stable event/message IDs and an inbox table for Kafka/RabbitMQ consumers.
+8. **Saga Operation Identity:** Reuse the same operation ID when retrying the same Saga step.
+9. **Durable Business Constraints:** Preserve payment/order records and enforce business-level uniqueness where necessary.
+10. **External Service Protection:** Propagate the operation identity or use the external provider's idempotency mechanism.
+
+## Where to Store Idempotency Data
+- **PostgreSQL/MySQL:** Recommended for durable records and critical business operations.
+- **Redis:** Useful for fast, temporary deduplication with TTL; not necessarily sufficient alone for critical transactions.
+- **Inbox Table:** Useful for deduplicating messages consumed from Kafka/RabbitMQ.
+
+## How Long Should It Live?
+Retention depends on the retry window and business requirements. Temporary API keys may live for hours or days, while critical payment and business-operation records may need to be retained much longer. Never rely solely on a short TTL to prevent duplicate financial transactions.
+
+## Key Rules
+- Same logical operation = same idempotency key.
+- New logical operation = new idempotency key.
+- Same key with a different payload = reject the request.
+- Concurrent duplicates = protect with a unique constraint and safe transaction/concurrency handling.
+- A timeout does not necessarily mean the operation failed.
+- Idempotency prevents duplicate business effects; it does not guarantee exactly-once message delivery.
+
+
+# Transactional Outbox Pattern — Microservices Interview Notes
+
+## 1. Definition
+The **Transactional Outbox Pattern** ensures that a service's database changes and the event describing those changes are saved atomically in the same local database transaction. A separate publisher then sends the event to a message broker.
+
+## 2. Why Do We Need It?
+In microservices, a service often needs to:
+1. Save business data in its database.
+2. Publish an event to Kafka or RabbitMQ.
+
+These two operations can fail independently, creating inconsistency. This is called the **dual-write problem**.
+
+### Without Outbox
+- **Database succeeds, publishing fails:** Order exists, but other services never receive the event.
+- **Publishing succeeds, database fails:** Other services receive an event for data that was never committed.
+- **Service crashes between operations:** Database and message broker become inconsistent.
+
+## 3. How Does It Work?
+1. Client sends a request to the service.
+2. Service starts a database transaction.
+3. Saves the business data, such as an order.
+4. Saves the corresponding event in the `outbox` table within the same transaction.
+5. Transaction commits: both records are saved, or neither is.
+6. A separate publisher reads the outbox and sends events to Kafka/RabbitMQ.
+7. Publisher records successful publication or tracks delivery state.
+8. Consumers process events idempotently because duplicate delivery is possible.
+
+## 4. Architecture Flow
+
+```text
+Client
+  |
+  v
+Order Service
+  |
+  | One database transaction
+  v
++----------------------------+
+| Orders Table               |
+| Outbox Table               |
++----------------------------+
+  |
+  | Transaction commits
+  v
+Outbox Publisher / CDC
+  |
+  v
+Kafka / RabbitMQ
+  |
+  +--> Inventory Service
+  |
+  +--> Notification Service
+```
+
+## 5. Example Scenario
+A customer places an order.
+
+- `orders` table stores order `ORD-101`.
+- `outbox` table stores an `OrderCreated` event.
+- Publisher sends the event to Kafka.
+- Inventory Service reserves stock.
+- Notification Service sends an order confirmation.
+
+If Kafka is unavailable, the committed outbox event remains available for retry.
+
+## 6. Example Database Tables
+
+```sql
+CREATE TABLE orders (
+    id VARCHAR(50) PRIMARY KEY,
+    customer_id VARCHAR(50) NOT NULL,
+    status VARCHAR(30) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE outbox (
+    event_id VARCHAR(100) PRIMARY KEY,
+    aggregate_type VARCHAR(100) NOT NULL,
+    aggregate_id VARCHAR(100) NOT NULL,
+    event_type VARCHAR(150) NOT NULL,
+    payload TEXT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    published_at TIMESTAMP
+);
+```
+
+The `event_id` must be unique and stable. Production implementations may also store retry count, delivery status, event version, and routing information.
+
+## 7. Spring Boot / Java Example
+
+The order and outbox event must be saved in the same database transaction.
+
+```java
+@Service
+public class OrderService {
+
+    private final OrderRepository orderRepository;
+    private final OutboxRepository outboxRepository;
+    private final ObjectMapper objectMapper;
+
+    public OrderService(
+            OrderRepository orderRepository,
+            OutboxRepository outboxRepository,
+            ObjectMapper objectMapper) {
+        this.orderRepository = orderRepository;
+        this.outboxRepository = outboxRepository;
+        this.objectMapper = objectMapper;
+    }
+
+    @Transactional
+    public void createOrder(CreateOrderRequest request)
+            throws JsonProcessingException {
+
+        Order order = new Order(
+            request.orderId(),
+            request.customerId(),
+            "CREATED"
+        );
+
+        orderRepository.save(order);
+
+        OutboxEvent event = new OutboxEvent(
+            UUID.randomUUID().toString(),
+            "Order",
+            order.getId(),
+            "OrderCreated",
+            objectMapper.writeValueAsString(order)
+        );
+
+        outboxRepository.save(event);
+    }
+}
+```
+
+This is illustrative code; entity constructors and repository methods must match your application.
+
+### Why Is `@Transactional` Important?
+Both repositories must participate in the same local database transaction.
+
+- If saving the order fails, the outbox insert rolls back.
+- If saving the event fails, the order insert rolls back.
+- If the transaction commits, both records are persisted.
+
+**Important:** A regular `@Transactional` database transaction does not automatically make a separate Kafka publish atomic with the database transaction.
+
+## 8. How Is the Event Published?
+
+### A. Polling Publisher
+A scheduled worker queries unpublished outbox records, sends them to the broker, and marks them as published.
+
+**Advantages**
+- Simple to understand and implement.
+- Does not require CDC infrastructure.
+
+**Disadvantages**
+- Repeated database polling adds load.
+- Multiple publisher instances require safe claiming or locking.
+- A crash after publishing but before marking the event published can cause duplicate publication.
+
+### B. Change Data Capture (CDC)
+A tool such as Debezium reads database transaction-log changes and publishes outbox events to Kafka.
+
+**Advantages**
+- Avoids frequent application-level polling.
+- Supports scalable, low-latency event publishing.
+
+**Disadvantages**
+- Requires additional infrastructure and monitoring.
+- Duplicate delivery can still occur.
+- Connector and schema configuration need care.
+
+## 9. When Should We Use It?
+Use the Outbox Pattern when a service must update its database and reliably publish an event describing that update.
+
+Common examples:
+- **Order Service:** Save order and publish `OrderCreated`.
+- **Payment Service:** Record payment result and publish `PaymentCompleted`.
+- **Inventory Service:** Update stock and publish `StockReserved`.
+- **Saga workflows:** Reliably publish events or commands after local transactions.
+- **Customer Service:** Save customer changes and notify downstream services.
+
+It is particularly useful when losing an event would leave other services with stale or inconsistent state.
+
+## 10. When Might We Not Need It?
+- No event needs to be published after the database update.
+- The operation is read-only.
+- Losing a notification is acceptable under the business requirements.
+- Another architecture already provides the required reliability and consistency.
+
+Do not add an outbox to every service automatically. Use it where database changes and event publication must remain consistent.
+
+## 11. Advantages
+- Prevents the dual-write inconsistency.
+- Saves business data and publication intent atomically.
+- Supports retries after broker outages.
+- Fits event-driven microservices and Saga workflows.
+- Provides visibility into pending events and recovery.
+
+## 12. Limitations and Important Considerations
+- **Duplicate publication:** Consumers must be idempotent.
+- **Ordering:** Preserve event order for an aggregate when business logic requires it.
+- **Cleanup:** Define a retention policy for published events.
+- **Retries:** Use backoff, monitoring, and recovery handling for persistent failures.
+- **Concurrency:** Multiple publishers must safely claim records, or use CDC.
+- **Schema evolution:** Version events and maintain compatibility.
+- **Consumer reliability:** Commit the deduplication record and business update atomically where possible.
+- **External side effects:** Outbox does not make payments, emails, or another service's database part of the same local transaction.
+
+## 13. Outbox vs Saga vs Two-Phase Commit
+
+| Pattern | Main Purpose |
+|---|---|
+| Transactional Outbox | Atomically save local business data and the event to publish |
+| Saga | Coordinate a multi-service workflow using local transactions and compensations |
+| Two-Phase Commit (2PC) | Coordinate a distributed transaction through prepare and commit/abort phases |
+
+These patterns solve different problems and can be used together. For example, each Saga participant can use an outbox to publish events reliably.
+
+## 14. Common Interview Questions
+
+### Q1. What problem does the Outbox Pattern solve?
+It solves the dual-write problem where database updates and message publication can fail independently.
+
+### Q2. Does the Outbox Pattern guarantee exactly-once delivery?
+No. Duplicate publication is possible. Consumers should deduplicate events using a stable event ID or implement idempotent business operations.
+
+### Q3. Why not publish to Kafka inside `@Transactional`?
+A normal Spring database transaction generally covers the database, not the Kafka broker. One operation may succeed while the other fails.
+
+### Q4. How does the pattern handle Kafka downtime?
+The event remains in the outbox after the database transaction commits. The publisher retries when Kafka becomes available.
+
+### Q5. What is the difference between polling and CDC?
+Polling periodically queries the outbox table. CDC reads database transaction-log changes, often through Debezium.
+
+### Q6. How does Outbox relate to Saga?
+Saga coordinates a multi-step business workflow. Outbox helps each participating service publish its local transaction's outcome reliably.
+
+### Q7. What if the publisher crashes after sending an event?
+The event may be sent again after recovery. Consumers must handle duplicate events safely.
+
+### Q8. Where should the outbox table be stored?
+Usually in the same database as the business data whose change the event describes, allowing both inserts to participate in one local transaction.
+
+## 15. One-Line Interview Answer
+The **Transactional Outbox Pattern** solves the dual-write problem by saving business data and its corresponding event in the same local database transaction, then publishing the event asynchronously with retry and duplicate-handling mechanisms.
+
+## Quick Revision
+- **Problem:** Database update and broker publish can fail independently.
+- **Solution:** Save business data and outbox event in one local transaction.
+- **Publisher:** Poll the outbox or use CDC/Debezium.
+- **Delivery:** Duplicate publication can happen.
+- **Consumer:** Use idempotency/deduplication.
+- **Used with:** Event-driven microservices and Saga workflows.
+- **Remember:** Outbox ensures reliable publication intent, not automatic exactly-once end-to-end processing.
