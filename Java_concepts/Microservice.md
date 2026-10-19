@@ -608,3 +608,613 @@ Eureka does not proxy or redirect every HTTP request. It provides the service re
 
 **One-line interview answer:** Eureka maintains a registry of service instances, and Spring Cloud LoadBalancer uses discovery information to select an instance so that OpenFeign can call it without hardcoding its host and port.
 
+# API Gateway, Resilience and Fault Tolerance in Microservices
+
+## 1. API Gateway
+
+### Definition
+An API Gateway acts as a **single entry point** for clients to access multiple microservices. It routes incoming requests to the appropriate backend service.
+
+### Problem
+- Clients need to know multiple microservice URLs.
+- Service hostnames and ports may change.
+- Authentication, logging, and rate limiting may be duplicated across services.
+
+### Example
+Without an API Gateway:
+- Order Service: `http://localhost:8001`
+- Payment Service: `http://localhost:8002`
+- User Service: `http://localhost:8003`
+
+With an API Gateway:
+- Orders: `http://localhost:9001/orders/**`
+- Payments: `http://localhost:9001/payments/**`
+- Users: `http://localhost:9001/users/**`
+
+### Explanation
+The client sends a request to the gateway, and the gateway forwards it to the appropriate microservice. Clients do not need to know the backend service's address.
+
+### Responsibilities
+- Request routing
+- Authentication and token validation
+- Logging and monitoring
+- Rate limiting
+- Request and response filtering
+
+**Note:** Business logic and resource-level authorization should remain in the appropriate backend services.
+
+---
+
+## 2. Spring Cloud Gateway
+
+### Definition
+Spring Cloud Gateway is a Spring-based API Gateway that provides routing, predicates, and filters for handling client requests.
+
+### Example
+A request to `/orders/101` is routed to the Order Service.
+
+```yaml
+server:
+  port: 9001
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      server:
+        webflux:
+          routes:
+            - id: order-service
+              uri: http://localhost:8001
+              predicates:
+                - Path=/orders/**
+```
+
+### Explanation
+- `id`: Identifies the route.
+- `uri`: Specifies the backend service address.
+- `Path=/orders/**`: Matches requests beginning with `/orders/`.
+- The gateway forwards matching requests to the configured destination.
+
+### Why is Spring Cloud Gateway reactive?
+Spring Cloud Gateway Server WebFlux uses Spring WebFlux and a non-blocking processing model.
+
+**Example:** While waiting for a backend HTTP response, the gateway can avoid blocking a dedicated thread for that entire wait.
+
+**Note:** It can route requests to traditional Spring MVC microservices. However, the gateway itself should use a compatible WebFlux setup rather than mixing in Spring MVC server dependencies.
+
+---
+
+## 3. Static Routing
+
+### Definition
+Static routing specifies the backend service URL directly in the gateway configuration.
+
+### Example
+```yaml
+uri: http://localhost:8001
+```
+
+### Explanation
+Requests matching the configured route are forwarded to that fixed address.
+
+### Advantages
+- Simple to configure.
+- Easy to understand and debug.
+
+### Limitation
+If the backend service's host or port changes, the gateway configuration may need to be updated.
+
+---
+
+## 4. Dynamic Routing with Eureka
+
+### Definition
+Dynamic routing uses service discovery to find registered service instances instead of hardcoding their addresses.
+
+### Example
+```yaml
+spring:
+  cloud:
+    gateway:
+      server:
+        webflux:
+          routes:
+            - id: order-service
+              uri: lb://ORDER-SERVICE
+              predicates:
+                - Path=/orders/**
+```
+
+### Explanation
+- `lb://` tells the gateway to use load-balanced service resolution.
+- `ORDER-SERVICE` is the service ID registered with Eureka.
+- Eureka maintains information about registered service instances.
+- Spring Cloud LoadBalancer selects an available instance.
+
+### Request flow
+```text
+Client
+  |
+  v
+API Gateway
+  |
+  v
+Eureka / Service Discovery
+  |
+  v
+Available Order Service Instance
+```
+
+### Advantages
+- Avoids hardcoding service addresses.
+- Supports multiple instances.
+- Helps the application adapt when service instances change.
+
+**Required setup:** Eureka Server, Eureka Client configuration for backend services, and the appropriate Eureka Client and Spring Cloud LoadBalancer dependencies in the gateway.
+
+---
+
+# Resilience and Fault Tolerance
+
+## 5. Resilience
+
+### Definition
+Resilience is the ability of a system to handle failures, recover from them, and continue providing service.
+
+### Example
+The Order Service calls the Inventory Service. If Inventory temporarily fails, the Order Service retries the call or returns a controlled fallback response.
+
+### Explanation
+Resilience reduces the impact of temporary failures and helps prevent one service's problem from affecting the entire application.
+
+---
+
+## 6. Fault Tolerance
+
+### Definition
+Fault tolerance is the ability of a system to continue providing its required functionality even when one or more components fail.
+
+### Example
+One Order Service instance goes down, but another healthy instance continues handling requests.
+
+### Explanation
+This requires appropriate redundancy, service discovery or load balancing, and healthy alternative instances.
+
+### Resilience vs Fault Tolerance
+- **Resilience:** Focuses on handling failures and recovering.
+- **Fault tolerance:** Focuses on continuing required operation despite failures.
+
+---
+
+## 7. Resilience4j
+
+### Definition
+Resilience4j is a Java library that provides fault-tolerance patterns such as Retry, Circuit Breaker, Rate Limiter, Time Limiter, and Bulkhead.
+
+### Example
+```java
+@CircuitBreaker(
+    name = "circuitOrderService",
+    fallbackMethod = "orderCircuitFallback"
+)
+public String placeOrder(String productId) {
+    return orderService.placeOrder(productId);
+}
+```
+
+### Explanation
+Resilience4j applies the configured behavior around the protected method. In Spring applications, annotation-based behavior commonly uses Spring AOP proxies.
+
+### Important requirements
+- Add the appropriate Resilience4j Spring Boot dependency.
+- Configure the matching instance name in `application.yml`.
+- Ensure calls pass through the Spring-managed proxy.
+- Calling an annotated method from another method in the same class can bypass the proxy.
+
+---
+
+# Resilience4j Patterns
+
+## 8. Retry Pattern
+
+### Definition
+The Retry pattern repeats a failed operation a limited number of times when the failure may be temporary.
+
+### Problem
+A service may fail temporarily because of a network interruption or a short-lived dependency issue.
+
+### Example
+The Order Service calls the Inventory Service. The first call fails, but a subsequent attempt succeeds.
+
+```java
+@Retryable(
+    retryFor = RuntimeException.class,
+    maxAttempts = 3,
+    backoff = @Backoff(delay = 2000)
+)
+public String placeOrder(String productId) {
+    return orderService.placeOrder(productId);
+}
+```
+
+### Explanation
+- `retryFor`: Specifies which exceptions trigger retries.
+- `maxAttempts = 3`: Allows at most three total attempts, including the initial attempt.
+- `delay = 2000`: Waits two seconds between retry attempts.
+
+### Implementation flow
+```text
+Order Service
+     |
+     v
+Retry Interceptor / Proxy
+     |
+     v
+Call the Protected Method
+     |
+     +---- Success ----> Return Result
+     |
+     +---- Failure ---> Retry if Eligible
+```
+
+### Best practices
+- Retry only failures that may be temporary.
+- Use bounded attempts and backoff.
+- Ensure repeated operations are safe, particularly for order creation and payments.
+- Use idempotency keys where appropriate to avoid duplicate business operations.
+
+### Implementation options
+- Spring Retry: `@Retryable`
+- Resilience4j Retry: `@Retry`
+
+Use the configuration and annotations appropriate to the library you have installed.
+
+---
+
+## 9. Rate Limiter Pattern
+
+### Definition
+A Rate Limiter restricts how many requests or method calls are permitted within a configured time period.
+
+### Problem
+Too many requests can overload a service, consume resources, or affect other clients.
+
+### Example
+Allow two calls every ten seconds.
+
+```yaml
+resilience4j:
+  ratelimiter:
+    instances:
+      orderService:
+        limitForPeriod: 2
+        limitRefreshPeriod: 10s
+        timeoutDuration: 0s
+```
+
+```java
+@RateLimiter(
+    name = "orderService",
+    fallbackMethod = "orderRateLimitFallback"
+)
+public String placeOrder(String productId) {
+    return orderService.placeOrder(productId);
+}
+```
+
+### Explanation
+- `limitForPeriod`: Number of permitted calls per refresh period.
+- `limitRefreshPeriod`: Time interval after which the permission limit refreshes.
+- `timeoutDuration`: Maximum time a caller waits for permission. With `0s`, it does not wait.
+
+When the permitted calls are exhausted, additional calls are rejected and the fallback can handle the rejection.
+
+### Where can it be implemented?
+- API Gateway: Protect public endpoints.
+- Individual microservices: Protect expensive operations.
+- Inter-service calls: Limit calls to a dependency.
+
+### Common use cases
+- Traffic spikes
+- Expensive APIs
+- Subscription-based request limits
+- Preventing excessive requests from clients
+
+**Note:** Rate limiting is not a complete DDoS protection solution by itself.
+
+---
+
+## 10. Circuit Breaker Pattern
+
+### Definition
+A Circuit Breaker stops calls to a dependency temporarily when failures exceed a configured threshold.
+
+### Problem
+Repeated calls to an unhealthy service can waste resources and contribute to cascading failures.
+
+### Example
+The Order Service repeatedly receives failures from the Inventory Service. Once the failure threshold is reached, the circuit opens and new calls are rejected.
+
+```yaml
+resilience4j:
+  circuitbreaker:
+    instances:
+      circuitOrderService:
+        registerHealthIndicator: true
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 5
+        minimumNumberOfCalls: 5
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 2
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        recordExceptions:
+          - feign.FeignException
+          - java.io.IOException
+          - java.lang.RuntimeException
+        ignoreExceptions:
+          - java.lang.IllegalArgumentException
+```
+
+### Explanation
+- `slidingWindowSize`: Examines the last five calls.
+- `minimumNumberOfCalls`: Requires five calls before evaluating the failure rate.
+- `failureRateThreshold`: Opens the circuit when the failure rate reaches 50%.
+- `waitDurationInOpenState`: Keeps the circuit open for ten seconds.
+- `permittedNumberOfCallsInHalfOpenState`: Allows two trial calls in Half-Open.
+- `recordExceptions`: Exceptions counted as failures.
+- `ignoreExceptions`: Exceptions excluded from failure and success calculations.
+
+### Three states
+
+**Closed**
+- Calls are allowed.
+- Failures are monitored.
+- The circuit opens if the configured failure threshold is reached.
+
+**Open**
+- Calls are rejected without invoking the protected dependency.
+- The service gets time to recover.
+
+**Half-Open**
+- A limited number of trial calls are allowed.
+- Successful trials can close the circuit.
+- Continued failures reopen it.
+
+### Implementation flow
+```text
+Order Service
+     |
+     v
+Circuit Breaker
+     |
+     +---- Closed ------> Call Inventory Service
+     |
+     +---- Open --------> Reject Call / Fallback
+     |
+     +---- Half-Open ---> Test Recovery
+```
+
+**Note:** Exception recording rules must match the exceptions your application actually throws. A Circuit Breaker does not automatically fix the failed service.
+
+---
+
+## 11. Fallback Pattern
+
+### Definition
+A fallback provides an alternative response or action when the main operation fails or is rejected.
+
+### Example
+```java
+public String orderCircuitFallback(
+        String productId,
+        Throwable ex) {
+
+    System.out.println("Circuit Breaker Invoked!");
+    System.out.println("Reason: " + ex.getMessage());
+
+    return "Inventory service is unavailable. Please try again later.";
+}
+```
+
+### Explanation
+If the protected call fails in a way handled by the Circuit Breaker, the fallback can return a controlled message rather than exposing an unhandled error to the caller.
+
+### Important points
+- The fallback parameters must match the original method's parameters, with an optional compatible exception parameter.
+- The fallback return type must be compatible with the original method's return type.
+- A fallback can also be used with Retry, Rate Limiter, Time Limiter, and Bulkhead.
+- Do not return a success message when the order or payment has actually failed.
+
+**Fallback is not a standalone Resilience4j module in the same sense as Circuit Breaker or Retry; it is a fallback mechanism used with these patterns.**
+
+---
+
+## 12. Timeout
+
+### Definition
+A timeout specifies the maximum time a client or operation waits for a response.
+
+### Example
+```yaml
+spring:
+  cloud:
+    openfeign:
+      client:
+        config:
+          inventory-service:
+            connectTimeout: 3000
+            readTimeout: 20000
+```
+
+### Explanation
+- `connectTimeout`: Maximum time allowed to establish a connection.
+- `readTimeout`: Maximum time allowed while waiting for response data after the connection is established, according to the HTTP client's timeout behavior.
+
+If the relevant timeout expires, the call fails instead of waiting indefinitely.
+
+### Why use timeouts?
+- Prevent excessively long waits.
+- Reduce resource exhaustion.
+- Improve responsiveness when a dependency is slow.
+
+---
+
+## 13. Time Limiter Pattern
+
+### Definition
+Resilience4j TimeLimiter limits the time allowed for a supported asynchronous operation.
+
+### Example
+```yaml
+resilience4j:
+  timelimiter:
+    instances:
+      timeLimitOrderService:
+        timeoutDuration: 2s
+        cancelRunningFuture: true
+```
+
+```java
+@TimeLimiter(
+    name = "timeLimitOrderService",
+    fallbackMethod = "orderTimeLimiterFallback"
+)
+public CompletableFuture<String> placeOrder(String productId) {
+    return CompletableFuture.supplyAsync(
+        () -> orderService.placeOrder(productId)
+    );
+}
+```
+
+### Explanation
+- `timeoutDuration`: Maximum time allowed before the TimeLimiter times out the operation.
+- `cancelRunningFuture`: Requests cancellation of the running future when the timeout occurs, where supported.
+
+If the time limit expires, the operation completes exceptionally and the fallback can return an alternative result.
+
+### Why is an asynchronous return type used?
+Resilience4j TimeLimiter works with supported asynchronous types such as `CompletionStage` and `Future`. A `CompletableFuture` is commonly used in Spring applications.
+
+### Timeout vs TimeLimiter
+- **Timeout:** Usually configures how long a client waits for a connection or response, such as an OpenFeign read timeout.
+- **TimeLimiter:** Limits the duration of a supported asynchronous operation at the application level.
+
+**Important:** Cancelling a future does not guarantee that the underlying HTTP request or blocking work has stopped. Configure client timeouts as well.
+
+---
+
+## 14. Bulkhead Pattern
+
+### Definition
+The Bulkhead pattern isolates workloads or limits concurrent operations so that excessive activity in one area does not exhaust all available resources.
+
+### Problem
+If too many requests execute concurrently, a service may run out of threads, connections, or other resources.
+
+### Example 1: Semaphore Bulkhead
+
+```yaml
+resilience4j:
+  bulkhead:
+    instances:
+      bulkHeadOrderService:
+        maxConcurrentCalls: 2
+        maxWaitDuration: 0s
+```
+
+```java
+@Bulkhead(
+    name = "bulkHeadOrderService",
+    type = Bulkhead.Type.SEMAPHORE,
+    fallbackMethod = "orderBulkHeadFallback"
+)
+public String placeOrder(String productId) {
+    return orderService.placeOrder(productId);
+}
+```
+
+### Explanation
+- `maxConcurrentCalls: 2`: Allows at most two simultaneous executions of the protected method.
+- `maxWaitDuration: 0s`: Does not wait for an available permit.
+- Additional calls are rejected when all permits are occupied.
+
+A Semaphore Bulkhead does not create a separate thread pool; the method executes on the caller's thread.
+
+### Example 2: ThreadPool Bulkhead
+
+```yaml
+resilience4j:
+  thread-pool-bulkhead:
+    instances:
+      bulkHeadOrderService:
+        maxThreadPoolSize: 2
+        coreThreadPoolSize: 2
+        queueCapacity: 0
+```
+
+```java
+@Bulkhead(
+    name = "bulkHeadOrderService",
+    type = Bulkhead.Type.THREADPOOL,
+    fallbackMethod = "orderBulkHeadFallback"
+)
+public CompletableFuture<String> placeOrder(String productId) {
+    return CompletableFuture.completedFuture(
+        orderService.placeOrder(productId)
+    );
+}
+```
+
+### Explanation
+- `maxThreadPoolSize`: Maximum worker-thread count.
+- `coreThreadPoolSize`: Core worker-thread count.
+- `queueCapacity: 0`: Does not allow tasks to wait in a queue.
+- Additional tasks can be rejected when no worker is available.
+
+The ThreadPool Bulkhead runs the protected method on its dedicated executor. Its protected method should use a compatible asynchronous return type, such as `CompletableFuture`.
+
+### Semaphore vs ThreadPool
+
+| Feature | Semaphore | ThreadPool |
+|---|---|---|
+| Limits concurrent work | Yes | Yes |
+| Uses a dedicated executor | No | Yes |
+| Typical return type | Synchronous, such as `String` | Asynchronous, such as `CompletableFuture` |
+| Configuration | `resilience4j.bulkhead` | `resilience4j.thread-pool-bulkhead` |
+
+**Important:** For ThreadPool Bulkhead, do not wrap the method body in an unrelated `CompletableFuture.supplyAsync()` without a specific reason. The bulkhead already schedules the protected method on its own executor.
+
+---
+
+# 15. Quick Comparison of Resilience Patterns
+
+| Pattern | Main purpose | Example |
+|---|---|---|
+| Retry | Handle temporary failures | Retry a failed Inventory call |
+| Rate Limiter | Control request frequency | Allow two calls every ten seconds |
+| Circuit Breaker | Prevent repeated calls to an unhealthy dependency | Open the circuit after repeated failures |
+| Fallback | Provide an alternative result | Return an Inventory unavailable message |
+| Timeout | Limit client waiting time | Feign read timeout of three seconds |
+| Time Limiter | Limit asynchronous operation duration | Time out a future after two seconds |
+| Bulkhead | Limit or isolate concurrent work | Permit only two simultaneous executions |
+
+---
+
+# 16. Recommended Implementation Order
+
+1. **API Gateway:** Configure routes for the backend microservices.
+2. **Eureka:** Register services and configure discovery-based routing.
+3. **Timeouts:** Configure connection and response timeouts for remote calls.
+4. **Retry:** Retry suitable temporary failures with bounded attempts and backoff.
+5. **Circuit Breaker:** Stop repeatedly calling an unhealthy dependency.
+6. **Fallback:** Return an appropriate alternative response when necessary.
+7. **Rate Limiter:** Control request frequency.
+8. **Bulkhead:** Limit concurrent work and isolate resources.
+9. **Time Limiter:** Limit supported asynchronous operations.
+10. **Testing and monitoring:** Test success, failure, timeout, rejection, and recovery scenarios.
+
+**Final takeaway:** An API Gateway manages client entry and routing, while resilience patterns protect service-to-service calls and resource usage. They complement one another but solve different problems.
+
