@@ -1653,3 +1653,1025 @@ Remember these key points:
 **One-line interview answer:**
 
 Spring Boot starts by bootstrapping the application context, loading configuration and bean definitions, applying conditional auto-configuration, initializing Spring-managed components, and starting an embedded web server when required, after which the application can process requests through its configured web stack.
+
+
+# Spring Boot Annotations — Interview Preparation & Reference
+
+## 1. What are Spring Boot Annotations?
+
+Annotations are metadata added to Java classes, methods, fields, and parameters to tell Spring how to configure, create, inject, validate, or manage application components.
+
+**Example:**
+```java
+@RestController
+public class StudentController {
+}
+```
+
+`@RestController` tells Spring that this class handles HTTP requests and returns response data, usually as JSON.
+
+---
+
+# 2. Core Spring Annotations
+
+## 2.1 `@SpringBootApplication`
+
+**Definition:** The main annotation that enables Spring Boot application configuration, component scanning, and auto-configuration.
+
+**Internally combines:**
+- `@SpringBootConfiguration`
+- `@EnableAutoConfiguration`
+- `@ComponentScan`
+
+**When to use:** On the main class to start a Spring Boot application.
+
+```java
+@SpringBootApplication
+public class StudentApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(StudentApplication.class, args);
+    }
+}
+```
+
+**Interview question:** What happens when `SpringApplication.run()` is executed?
+
+At a high level, Spring Boot prepares the application environment, creates and refreshes the Spring ApplicationContext, discovers and registers beans, applies auto-configuration, and starts the embedded web server for a web application.
+
+## 2.2 `@Component`
+
+**Definition:** Marks a class as a Spring-managed component so it can be discovered during component scanning.
+
+```java
+@Component
+public class EmailUtil {
+    public void sendEmail() {
+        System.out.println("Email sent");
+    }
+}
+```
+
+**When to use:** For general-purpose classes that need to be managed by Spring.
+
+## 2.3 `@Service`
+
+**Definition:** A specialization of `@Component` used to represent the service or business-logic layer.
+
+```java
+@Service
+public class StudentService {
+    public String getStudent() {
+        return "Student details";
+    }
+}
+```
+
+**When to use:** For business logic, such as creating students or calculating order totals.
+
+## 2.4 `@Repository`
+
+**Definition:** A specialization of `@Component` used for the persistence or data-access layer.
+
+```java
+@Repository
+public class StudentRepository {
+}
+```
+
+**When to use:** For data-access classes. Spring Data repository interfaces commonly use repository infrastructure without requiring an explicit `@Repository` annotation.
+
+**Important:** `@Repository` also participates in persistence exception translation when applicable.
+
+## 2.5 `@Controller`
+
+**Definition:** Marks a class as a Spring MVC controller, commonly used to return views.
+
+```java
+@Controller
+public class HomeController {
+
+    @GetMapping("/home")
+    public String home() {
+        return "home";
+    }
+}
+```
+
+**When to use:** For MVC applications that return views such as Thymeleaf templates.
+
+## 2.6 `@RestController`
+
+**Definition:** A convenience annotation combining `@Controller` and `@ResponseBody`.
+
+```java
+@RestController
+@RequestMapping("/students")
+public class StudentController {
+
+    @GetMapping("/{id}")
+    public String getStudent(@PathVariable int id) {
+        return "Student ID: " + id;
+    }
+}
+```
+
+**When to use:** For REST APIs that return JSON, text, or other response data.
+
+**Interview question:** What is the difference between `@Controller` and `@RestController`?
+
+- `@Controller`: commonly returns a view name; use `@ResponseBody` when a method should return response data directly.
+- `@RestController`: response bodies are the default for its handler methods.
+
+---
+
+# 3. Dependency Injection Annotations
+
+## 3.1 `@Autowired`
+
+**Definition:** Requests that Spring inject a suitable bean into a dependency.
+
+```java
+@Autowired
+private StudentService studentService;
+```
+
+**When to use:** When Spring needs to supply a dependency.
+
+**Recommended approach — constructor injection:**
+
+```java
+@Service
+public class StudentService {
+}
+
+@RestController
+public class StudentController {
+
+    private final StudentService studentService;
+
+    public StudentController(StudentService studentService) {
+        this.studentService = studentService;
+    }
+}
+```
+
+When a class has a single constructor, Spring can use it without `@Autowired`.
+
+**Why prefer constructor injection?**
+- Makes required dependencies explicit.
+- Supports immutable `final` fields.
+- Simplifies unit testing.
+- Avoids common field-injection problems.
+
+## 3.2 `@Qualifier`
+
+**Definition:** Selects a specific bean when multiple beans match a dependency type.
+
+```java
+@Component("emailNotification")
+class EmailNotification implements Notification {
+}
+
+@Component("smsNotification")
+class SmsNotification implements Notification {
+}
+
+@Service
+class NotificationService {
+
+    private final Notification notification;
+
+    NotificationService(
+            @Qualifier("emailNotification")
+            Notification notification) {
+        this.notification = notification;
+    }
+}
+```
+
+**When to use:** When multiple implementations of the same interface exist.
+
+## 3.3 `@Primary`
+
+**Definition:** Makes one bean the preferred candidate when multiple beans match a single-valued dependency.
+
+```java
+@Component
+@Primary
+class EmailNotification implements Notification {
+}
+```
+
+**Difference:**
+- `@Primary`: declares the default preferred bean.
+- `@Qualifier`: explicitly identifies the bean to inject.
+
+## 3.4 `@Value`
+
+**Definition:** Injects a property value into a field, constructor parameter, or method parameter.
+
+```java
+@Value("${app.name}")
+private String appName;
+```
+
+In `application.properties`:
+
+```properties
+app.name=StudentApplication
+```
+
+**When to use:** For injecting individual configuration values.
+
+## 3.5 `@ConfigurationProperties`
+
+**Definition:** Binds a group of external configuration properties to a Java object.
+
+```java
+@ConfigurationProperties(prefix = "app")
+public class AppProperties {
+
+    private String name;
+    private int timeout;
+
+    // Getters and setters
+}
+```
+
+```properties
+app.name=StudentApplication
+app.timeout=30
+```
+
+Enable registration, for example, using `@ConfigurationPropertiesScan` on the application class.
+
+**When to use:** When an application has multiple related configuration properties.
+
+**Interview question:** `@Value` vs `@ConfigurationProperties`?
+
+- `@Value`: useful for individual values and supports Spring property expressions.
+- `@ConfigurationProperties`: better for structured, type-safe groups of settings.
+
+---
+
+# 4. Configuration Annotations
+
+## 4.1 `@Configuration`
+
+**Definition:** Declares a class as a source of Spring bean definitions.
+
+```java
+@Configuration
+public class AppConfig {
+
+    @Bean
+    public RestTemplate restTemplate() {
+        return new RestTemplate();
+    }
+}
+```
+
+**When to use:** To define application configuration and beans explicitly.
+
+## 4.2 `@Bean`
+
+**Definition:** Marks a method whose returned object should be registered as a Spring bean.
+
+```java
+@Configuration
+public class AppConfig {
+
+    @Bean
+    public Clock clock() {
+        return Clock.systemUTC();
+    }
+}
+```
+
+**When to use:** When you need to register an object, especially a third-party class that you cannot annotate with `@Component`.
+
+**Difference:**
+- `@Component`: put it on a class for component scanning.
+- `@Bean`: put it on a method to register its returned object.
+
+## 4.3 `@Import`
+
+**Definition:** Imports additional configuration classes or supported component definitions into the Spring configuration.
+
+```java
+@Configuration
+@Import(DatabaseConfig.class)
+public class AppConfig {
+}
+```
+
+**When to use:** To organize configuration into reusable classes.
+
+## 4.4 `@Profile`
+
+**Definition:** Makes a bean or configuration active only for specified profiles.
+
+```java
+@Configuration
+@Profile("dev")
+public class DevConfig {
+}
+```
+
+Activate it with:
+
+```properties
+spring.profiles.active=dev
+```
+
+**When to use:** To separate development, testing, and production configurations.
+
+---
+
+# 5. Auto-Configuration and Conditional Annotations
+
+## 5.1 `@EnableAutoConfiguration`
+
+**Definition:** Enables Spring Boot's auto-configuration mechanism.
+
+Spring Boot examines the classpath, existing beans, and configuration properties to determine which configurations may apply.
+
+**Example:** If Spring MVC dependencies are present, Boot can configure MVC infrastructure when the relevant conditions are satisfied.
+
+**Important:** Auto-configuration backs off in many cases when the application provides its own relevant beans. The exact behavior depends on each configuration's conditions.
+
+## 5.2 `@ConditionalOnClass`
+
+**Definition:** Applies configuration when a specified class is available on the classpath.
+
+```java
+@ConditionalOnClass(name = "com.example.SomeLibrary")
+@Configuration
+class LibraryConfig {
+}
+```
+
+**When to use:** In conditional configuration, especially library integrations and auto-configuration.
+
+## 5.3 `@ConditionalOnMissingBean`
+
+**Definition:** Applies configuration when a matching bean is not already available.
+
+```java
+@Bean
+@ConditionalOnMissingBean
+public Clock clock() {
+    return Clock.systemUTC();
+}
+```
+
+**When to use:** To provide a default bean that applications can override.
+
+## 5.4 `@EnableConfigurationProperties`
+
+**Definition:** Registers classes annotated with `@ConfigurationProperties` for configuration-property binding.
+
+```java
+@Configuration
+@EnableConfigurationProperties(AppProperties.class)
+public class AppConfig {
+}
+```
+
+**Interview question:** How does Spring Boot reduce configuration?
+
+It provides auto-configuration based on dependencies, existing beans, application properties, and conditional rules. Developers can still override or customize that configuration.
+
+---
+
+# 6. REST API Annotations
+
+## 6.1 `@RequestMapping`
+
+**Definition:** Maps HTTP requests to a controller or handler method.
+
+```java
+@RestController
+@RequestMapping("/students")
+public class StudentController {
+
+    @RequestMapping(value = "/all", method = RequestMethod.GET)
+    public String getAllStudents() {
+        return "All students";
+    }
+}
+```
+
+**When to use:** For shared class-level paths or flexible request mapping.
+
+## 6.2 `@GetMapping`
+
+Maps HTTP GET requests.
+
+```java
+@GetMapping("/{id}")
+public String getStudent(@PathVariable int id) {
+    return "Student " + id;
+}
+```
+
+## 6.3 `@PostMapping`
+
+Maps HTTP POST requests, commonly for creating resources.
+
+```java
+@PostMapping
+public String createStudent(@RequestBody Student student) {
+    return "Student created";
+}
+```
+
+## 6.4 `@PutMapping`
+
+Maps HTTP PUT requests, commonly for replacing a resource representation.
+
+```java
+@PutMapping("/{id}")
+public String updateStudent(
+        @PathVariable int id,
+        @RequestBody Student student) {
+    return "Student updated";
+}
+```
+
+## 6.5 `@PatchMapping`
+
+Maps HTTP PATCH requests, commonly for partial updates.
+
+```java
+@PatchMapping("/{id}")
+public String updateStudentName(
+        @PathVariable int id,
+        @RequestBody Map<String, Object> updates) {
+    return "Student partially updated";
+}
+```
+
+## 6.6 `@DeleteMapping`
+
+Maps HTTP DELETE requests.
+
+```java
+@DeleteMapping("/{id}")
+public String deleteStudent(@PathVariable int id) {
+    return "Student deleted";
+}
+```
+
+**Interview question:** What is the difference between PUT and PATCH?
+
+- PUT commonly replaces the resource representation.
+- PATCH applies a partial modification.
+- Exact behavior depends on the API contract.
+
+## 6.7 `@PathVariable`
+
+**Definition:** Reads a value from the URI path.
+
+```java
+@GetMapping("/{id}")
+public String getStudent(@PathVariable("id") int studentId) {
+    return "ID: " + studentId;
+}
+```
+
+Request: `GET /students/10`
+
+Value: `studentId = 10`
+
+## 6.8 `@RequestParam`
+
+**Definition:** Reads a query parameter or form parameter.
+
+```java
+@GetMapping("/search")
+public String searchStudent(@RequestParam String name) {
+    return "Searching: " + name;
+}
+```
+
+Request: `GET /students/search?name=Ravi`
+
+**Difference:**
+- `@PathVariable`: identifies a value in the URI path.
+- `@RequestParam`: reads a request parameter.
+
+## 6.9 `@RequestBody`
+
+**Definition:** Binds the HTTP request body to a Java object, typically using an HTTP message converter such as Jackson for JSON.
+
+```java
+@PostMapping
+public Student createStudent(@RequestBody Student student) {
+    return student;
+}
+```
+
+**When to use:** When the client sends JSON or another supported representation in the request body.
+
+## 6.10 `@ResponseBody`
+
+**Definition:** Writes a handler method's return value directly to the HTTP response body using an appropriate message converter.
+
+It is included by default in `@RestController`.
+
+## 6.11 `@ResponseStatus`
+
+**Definition:** Associates a specified HTTP status with a controller response or exception.
+
+```java
+@ResponseStatus(HttpStatus.CREATED)
+@PostMapping
+public String createStudent() {
+    return "Created";
+}
+```
+
+**When to use:** For a fixed response status. For dynamic status codes and more complex error handling, consider `ResponseEntity`.
+
+## 6.12 `ResponseEntity`
+
+`ResponseEntity` is a class, not an annotation. It lets a controller return a response body, HTTP status, and headers.
+
+```java
+@PostMapping
+public ResponseEntity<Student> createStudent(
+        @RequestBody Student student) {
+    return ResponseEntity
+            .status(HttpStatus.CREATED)
+            .body(student);
+}
+```
+
+---
+
+# 7. Validation Annotations
+
+Validation examples typically use `jakarta.validation` annotations and a validation implementation such as Hibernate Validator.
+
+## 7.1 `@Valid`
+
+**Definition:** Triggers validation of an object according to its declared validation constraints when supported by the method argument processing.
+
+```java
+@PostMapping
+public String createStudent(@Valid @RequestBody Student student) {
+    return "Student created";
+}
+```
+
+## 7.2 `@NotNull`
+
+The value must not be null.
+
+## 7.3 `@NotBlank`
+
+A string must not be null and must contain at least one non-whitespace character.
+
+## 7.4 `@NotEmpty`
+
+A string, collection, map, or supported array must not be null or empty.
+
+## 7.5 `@Size`
+
+Specifies permitted size or length limits for supported values.
+
+## 7.6 `@Email`
+
+Checks whether a string conforms to the validation provider's email format rules.
+
+**Example model:**
+
+```java
+public class Student {
+
+    @NotBlank(message = "Name is required")
+    private String name;
+
+    @Email(message = "Email must be valid")
+    private String email;
+
+    @Size(min = 10, max = 10)
+    private String mobileNumber;
+
+    // Getters and setters
+}
+```
+
+**Important:** Constraints do not validate incoming requests by themselves. Ensure validation is enabled at the appropriate boundary, commonly using `@Valid` on the request body, and configure appropriate error responses.
+
+---
+
+# 8. Spring Data JPA Annotations
+
+## 8.1 `@Entity`
+
+Marks a Java class as a JPA entity.
+
+```java
+@Entity
+public class Student {
+}
+```
+
+## 8.2 `@Table`
+
+Specifies the database table mapping.
+
+```java
+@Entity
+@Table(name = "students")
+public class Student {
+}
+```
+
+## 8.3 `@Id`
+
+Marks the primary-key field or property.
+
+```java
+@Id
+private Long id;
+```
+
+## 8.4 `@GeneratedValue`
+
+Specifies how a primary key is generated.
+
+```java
+@Id
+@GeneratedValue(strategy = GenerationType.IDENTITY)
+private Long id;
+```
+
+## 8.5 `@Column`
+
+Customizes column mapping and selected column properties.
+
+```java
+@Column(name = "student_name", nullable = false)
+private String name;
+```
+
+## 8.6 `@Transient`
+
+Marks an entity field or property that should not be persisted as a database column.
+
+```java
+@Transient
+private String temporaryMessage;
+```
+
+## 8.7 `@OneToOne`, `@OneToMany`, `@ManyToOne`, `@ManyToMany`
+
+These annotations define relationships between JPA entities.
+
+Examples:
+- `@OneToOne`: one person and one passport.
+- `@OneToMany`: one department and many employees.
+- `@ManyToOne`: many employees belong to one department.
+- `@ManyToMany`: students and courses can have many-to-many relationships.
+
+**When to use:** When modeling relational data and entity associations.
+
+## 8.8 `@Transactional`
+
+**Definition:** Declares that a method or class should execute with transaction semantics managed by Spring.
+
+```java
+@Service
+public class StudentService {
+
+    @Transactional
+    public void createStudent() {
+        // Perform related database operations
+    }
+}
+```
+
+**When to use:** When multiple database operations need to succeed or roll back together.
+
+**Important interview points:**
+- In the usual proxy-based configuration, calls must pass through the Spring proxy for transaction advice to apply.
+- Self-invocation generally bypasses proxy-based transaction interception.
+- By default, unchecked exceptions trigger rollback; checked-exception behavior can be customized.
+- A transaction does not automatically cover independent remote service calls in a distributed system.
+
+---
+
+# 9. Exception Handling Annotations
+
+## 9.1 `@ExceptionHandler`
+
+Handles specified exceptions in a controller or advice class.
+
+```java
+@ExceptionHandler(StudentNotFoundException.class)
+public ResponseEntity<String> handleNotFound(
+        StudentNotFoundException ex) {
+    return ResponseEntity
+            .status(HttpStatus.NOT_FOUND)
+            .body(ex.getMessage());
+}
+```
+
+## 9.2 `@ControllerAdvice`
+
+Provides shared advice for controllers, including exception handling.
+
+## 9.3 `@RestControllerAdvice`
+
+Combines `@ControllerAdvice` and `@ResponseBody`, making it useful for centralized REST API exception handling.
+
+```java
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+
+    @ExceptionHandler(StudentNotFoundException.class)
+    public ResponseEntity<String> handleStudentNotFound(
+            StudentNotFoundException ex) {
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body(ex.getMessage());
+    }
+}
+```
+
+**When to use:** When multiple controllers need consistent error handling.
+
+---
+
+# 10. Lifecycle and Scope Annotations
+
+## 10.1 `@PostConstruct`
+
+Runs an initialization callback after dependency injection and before the bean is put into normal service.
+
+```java
+@PostConstruct
+public void initialize() {
+    System.out.println("Bean initialized");
+}
+```
+
+## 10.2 `@PreDestroy`
+
+Runs a destruction callback when Spring destroys the bean, provided the lifecycle is managed appropriately.
+
+```java
+@PreDestroy
+public void cleanup() {
+    System.out.println("Cleaning up resources");
+}
+```
+
+**Package note:** In modern Spring Boot applications, use `jakarta.annotation.PostConstruct` and `jakarta.annotation.PreDestroy`.
+
+## 10.3 `@Scope`
+
+Defines a bean's scope.
+
+```java
+@Component
+@Scope("prototype")
+public class ReportGenerator {
+}
+```
+
+Common scopes:
+- `singleton`: one bean instance per bean definition per Spring container; this is the default.
+- `prototype`: a new instance each time the container is asked to create one.
+- `request`: one instance per HTTP request in a web-aware context.
+- `session`: one instance per HTTP session in a web-aware context.
+
+**Interview question:** Are Spring singleton beans thread-safe?
+
+No. Singleton scope does not guarantee thread safety. A singleton bean that is accessed concurrently must be designed appropriately.
+
+---
+
+# 11. Scheduling and Asynchronous Execution
+
+## 11.1 `@EnableScheduling` and `@Scheduled`
+
+Enable scheduled task processing and declare a scheduled method.
+
+```java
+@Configuration
+@EnableScheduling
+public class SchedulingConfig {
+}
+
+@Component
+public class ReportScheduler {
+
+    @Scheduled(fixedRate = 60000)
+    public void generateReport() {
+        System.out.println("Generating report");
+    }
+}
+```
+
+`fixedRate = 60000` schedules executions at a 60-second rate. Actual execution timing can be affected by task configuration and execution duration.
+
+## 11.2 `@EnableAsync` and `@Async`
+
+Enable Spring's asynchronous method execution and mark a method for asynchronous invocation.
+
+```java
+@Configuration
+@EnableAsync
+public class AsyncConfig {
+}
+
+@Service
+public class EmailService {
+
+    @Async
+    public CompletableFuture<String> sendEmail() {
+        return CompletableFuture.completedFuture("Email sent");
+    }
+}
+```
+
+**Important:** Configure an appropriate executor for production workloads. In the usual proxy-based setup, self-invocation does not trigger `@Async` interception.
+
+---
+
+# 12. Caching Annotations
+
+Caching requires an appropriate cache manager and enabled caching.
+
+## 12.1 `@EnableCaching`
+
+Enables Spring's annotation-driven cache management.
+
+## 12.2 `@Cacheable`
+
+Uses a cache to avoid repeatedly executing a method for the same cache key.
+
+```java
+@Cacheable(value = "students", key = "#id")
+public Student getStudent(Long id) {
+    return repository.findById(id).orElseThrow();
+}
+```
+
+## 12.3 `@CachePut`
+
+Executes the method and updates the cache with the returned value.
+
+## 12.4 `@CacheEvict`
+
+Removes matching cache entries.
+
+```java
+@CacheEvict(value = "students", key = "#id")
+public void deleteStudent(Long id) {
+    repository.deleteById(id);
+}
+```
+
+**When to use:** When frequently requested data can be cached safely and invalidated correctly.
+
+**Interview question:** `@Cacheable` vs `@CachePut`?
+
+- `@Cacheable`: may skip method execution when a cache hit occurs.
+- `@CachePut`: executes the method and updates the cache.
+
+---
+
+# 13. Spring Security Annotations
+
+## 13.1 `@EnableMethodSecurity`
+
+Enables method-level security features.
+
+## 13.2 `@PreAuthorize`
+
+Checks authorization before method execution.
+
+```java
+@PreAuthorize("hasRole('ADMIN')")
+public void deleteStudent(Long id) {
+}
+```
+
+## 13.3 `@PostAuthorize`
+
+Checks an authorization expression after method execution, before returning the result to the caller.
+
+```java
+@PostAuthorize("returnObject.owner == authentication.name")
+public Student getStudent(Long id) {
+    return repository.findById(id).orElseThrow();
+}
+```
+
+Use it carefully because the method may already have performed work before the authorization check.
+
+**When to use:** For fine-grained access control at the method level.
+
+---
+
+# 14. Testing Annotations
+
+## 14.1 `@SpringBootTest`
+
+Loads the Spring application context for integration-style testing.
+
+```java
+@SpringBootTest
+class StudentApplicationTests {
+}
+```
+
+## 14.2 `@WebMvcTest`
+
+Loads a focused Spring MVC test slice, commonly used to test controllers with MockMvc.
+
+## 14.3 `@DataJpaTest`
+
+Loads a JPA-focused test slice for persistence tests.
+
+## 14.4 `@MockBean` and `@MockitoBean`
+
+These annotations are used to override beans with mocks in Spring tests, depending on the Spring Boot and Spring Framework version.
+
+- `@MockBean` is associated with Spring Boot's test support and is deprecated in newer Spring Boot versions.
+- `@MockitoBean` is provided by Spring Framework's test support in modern versions.
+
+**Interview question:** `@SpringBootTest` vs `@WebMvcTest`?
+
+- `@SpringBootTest`: broader application-context testing.
+- `@WebMvcTest`: focused testing of the MVC layer, with collaborators typically mocked.
+
+---
+
+# 15. Important Differences — Quick Revision
+
+| Annotations | Main difference |
+|---|---|
+| `@Component` vs `@Bean` | Class discovered by scanning vs object returned by a configuration method |
+| `@Component` vs `@Service` | General component vs business/service-layer specialization |
+| `@Repository` vs `@Service` | Persistence-layer specialization vs business-layer specialization |
+| `@Controller` vs `@RestController` | MVC controller vs controller with response bodies by default |
+| `@Autowired` vs `@Qualifier` | Injects a dependency vs selects a specific matching bean |
+| `@Primary` vs `@Qualifier` | Default preferred bean vs explicit bean selection |
+| `@Value` vs `@ConfigurationProperties` | Individual property injection vs structured configuration binding |
+| `@RequestParam` vs `@PathVariable` | Request parameter vs URI path value |
+| `@RequestBody` vs `@ResponseBody` | Request body to Java object vs Java return value to response body |
+| `@Valid` vs `@Validated` | Triggers Bean Validation vs Spring validation support with additional features such as validation groups |
+| `@Transactional` vs `@Cacheable` | Transaction management vs caching |
+| `@PostConstruct` vs `@PreDestroy` | Initialization callback vs destruction callback |
+| `@Cacheable` vs `@CachePut` | May reuse cached result vs executes method and updates cache |
+| `@SpringBootTest` vs `@WebMvcTest` | Broad integration test vs MVC test slice |
+
+---
+
+# 16. Common Spring Boot Interview Questions
+
+1. What is `@SpringBootApplication` and which annotations does it combine?
+2. What happens internally when `SpringApplication.run()` executes?
+3. What is the difference between `@Component`, `@Service`, and `@Repository`?
+4. What is dependency injection? Why is constructor injection recommended?
+5. What happens when multiple beans of the same type exist?
+6. What is the difference between `@Bean` and `@Component`?
+7. How does Spring Boot auto-configuration work?
+8. How can you override Spring Boot's default configuration?
+9. What is the difference between `@Controller` and `@RestController`?
+10. What is the difference between `@RequestParam` and `@PathVariable`?
+11. How does `@RequestBody` convert JSON into a Java object?
+12. How does validation work with `@Valid`?
+13. How do `@ControllerAdvice` and `@ExceptionHandler` work together?
+14. What does `@Transactional` do? What are its limitations?
+15. What is the difference between singleton and prototype scope?
+16. What are `@PostConstruct` and `@PreDestroy` used for?
+17. How do `@Scheduled` and `@Async` work?
+18. How do `@Cacheable`, `@CachePut`, and `@CacheEvict` differ?
+19. How do `@PreAuthorize` and `@PostAuthorize` differ?
+20. What is the difference between `@SpringBootTest` and `@WebMvcTest`?
+
+---
+
+# 17. Recommended Learning Order
+
+Study the annotations in this order to understand the conditions behind them, rather than memorizing names:
+
+1. `@SpringBootApplication` — application startup.
+2. `@Component`, `@Service`, `@Repository`, `@Controller`, `@RestController` — bean discovery and layers.
+3. `@Autowired`, `@Qualifier`, `@Primary`, `@Bean`, `@Configuration` — dependency injection and configuration.
+4. `@RequestMapping`, `@GetMapping`, `@PostMapping`, `@PathVariable`, `@RequestParam`, `@RequestBody` — REST APIs.
+5. `@Entity`, `@Id`, `@GeneratedValue`, `@Transactional` — database and transactions.
+6. `@Valid`, `@NotBlank`, `@ExceptionHandler`, `@RestControllerAdvice` — validation and error handling.
+7. `@ConditionalOnMissingBean`, `@ConfigurationProperties`, `@Profile` — auto-configuration and environments.
+8. `@PostConstruct`, `@PreDestroy`, `@Scope` — bean lifecycle.
+9. `@Scheduled`, `@Async`, caching annotations — background work and performance.
+10. Spring Security and testing annotations — authorization and verification.
+
+**Final interview tip:** For every annotation, prepare four things: its definition, why it is needed, when to use it, and what happens internally. Be ready to explain a real project example and at least one limitation or alternative.
