@@ -1206,6 +1206,15 @@ Spring Boot can configure relevant web infrastructure, including Spring MVC and 
 5. Applicable bean definitions are registered with the application context.
 
 Common conditional annotations include:
+# Spring Boot Conditional Annotations
+
+## 1. What are Conditional Annotations?
+
+Conditional annotations help Spring Boot **register a bean or apply a configuration only when a specific condition is satisfied**.
+
+They are commonly used in Spring Boot auto-configuration to decide whether a bean should be created based on the classpath, existing beans, application properties, or custom logic.
+
+### Common Conditional Annotations
 
 | Annotation | Purpose |
 |---|---|
@@ -1213,6 +1222,138 @@ Common conditional annotations include:
 | `@ConditionalOnMissingBean` | Applies when a matching bean is not already available. |
 | `@ConditionalOnBean` | Applies when a matching bean is available. |
 | `@ConditionalOnProperty` | Applies based on a configuration property's value. |
+
+### Example: `@ConditionalOnProperty`
+
+**application.properties**
+
+```properties
+app.email.enabled=true
+```
+
+**Configuration class**
+
+```java
+@Configuration
+public class EmailConfig {
+
+    @Bean
+    @ConditionalOnProperty(
+        name = "app.email.enabled",
+        havingValue = "true"
+    )
+    public EmailService emailService() {
+        return new EmailService();
+    }
+}
+```
+
+**Explanation:**
+
+- If `app.email.enabled=true`, Spring registers the `EmailService` bean.
+- If the property is missing or has another value, the bean is not registered under this condition's default settings.
+- `matchIfMissing = true` can be used if the condition should match when the property is absent.
+
+**When to use:** When a feature should be enabled or disabled through configuration without changing the Java code.
+
+---
+
+## 2. Custom Conditional Annotations
+
+When the built-in conditional annotations do not meet our requirements, we can create a **custom condition** using Spring's `Condition` interface.
+
+### Steps to create a custom condition
+
+1. Create a class that implements the `Condition` interface.
+2. Override the `matches()` method and define the condition.
+3. Apply `@Conditional` to a `@Bean` method or configuration class.
+4. Spring registers the bean only when `matches()` returns `true`.
+
+### Example: Create a bean only when the application runs in a specific environment
+
+**Step 1: Implement the `Condition` interface**
+
+```java
+import org.springframework.context.annotation.Condition;
+import org.springframework.context.annotation.ConditionContext;
+import org.springframework.core.type.AnnotatedTypeMetadata;
+
+public class DevEnvironmentCondition implements Condition {
+
+    @Override
+    public boolean matches(
+            ConditionContext context,
+            AnnotatedTypeMetadata metadata) {
+
+        String environment =
+                context.getEnvironment()
+                       .getProperty("app.environment");
+
+        return "dev".equalsIgnoreCase(environment);
+    }
+}
+```
+
+**Explanation:**
+
+- `Condition` is the interface used to define custom matching logic.
+- `matches()` is called by Spring while evaluating the condition.
+- `ConditionContext` provides access to the environment, bean factory, registry, and other configuration facilities.
+- `AnnotatedTypeMetadata` provides metadata about the annotated element.
+- If `matches()` returns `true`, the conditional bean definition can be registered; otherwise, it is skipped.
+
+**Step 2: Apply `@Conditional` to the bean method**
+
+```java
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Conditional;
+
+@Configuration
+public class AppConfig {
+
+    @Bean
+    @Conditional(DevEnvironmentCondition.class)
+    public EmailService emailService() {
+        return new EmailService();
+    }
+}
+```
+
+**Step 3: Configure the environment**
+
+In `application.properties`:
+
+```properties
+app.environment=dev
+```
+
+**Result:**
+
+- If `app.environment=dev`, Spring registers the `EmailService` bean.
+- If `app.environment=prod`, Spring does not register that bean through this configuration method.
+
+---
+
+## 3. Built-in vs Custom Conditions
+
+| Built-in conditions | Custom conditions |
+|---|---|
+| Use Spring Boot's predefined annotations. | Implement the `Condition` interface. |
+| Suitable for common conditions such as classpath, bean existence, and property values. | Suitable for application-specific business or environment checks. |
+| Require less code. | Require custom matching logic in `matches()`. |
+| Example: `@ConditionalOnProperty`. | Example: `@Conditional(DevEnvironmentCondition.class)`. |
+
+## 4. Interview Points
+
+- **Why are conditional annotations needed?** To register beans only when the required conditions are satisfied.
+- **Where are they commonly used?** Spring Boot auto-configuration and feature-specific configuration.
+- **What is the purpose of `Condition.matches()`?** It determines whether a condition is satisfied.
+- **What happens when `matches()` returns `false`?** The conditional bean definition is not registered through that configuration path.
+- **Can `@Conditional` be applied to a configuration class?** Yes. It can conditionally apply the configuration class and its bean definitions.
+- **Can custom conditions access application properties?** Yes, through `ConditionContext.getEnvironment()`.
+
+**Remember:** Use built-in conditional annotations whenever they meet the requirement. Implement a custom `Condition` only when the required logic cannot be expressed conveniently using the built-in conditions.
 
 ### Example
 
