@@ -858,3 +858,403 @@ Here:
 | `fail()` | Fails the test explicitly |
 
 **Interview tip:** The assertions you'll use most frequently in Spring Boot unit tests are `assertEquals()`, `assertNotNull()`, `assertTrue()`, `assertThrows()`, and `assertAll()`.
+
+# Mockito and JUnit 5 — Interview Preparation Notes
+
+## 1. `@Mock` vs `@Spy`
+
+### `@Mock`
+
+`@Mock` creates a fake object whose methods do not execute the real implementation by default.
+
+- Use it to isolate the class being tested from its dependencies.
+- Unstubbed methods return default values, such as `null`, `0`, or `false`.
+- Use `when().thenReturn()` to configure return values.
+
+```java
+@Mock
+FeignClientConfig feignClientConfig;
+
+@Test
+void mockTest() {
+    Mockito.when(feignClientConfig.placeOrder("123"))
+           .thenReturn("Order placed");
+
+    String result = feignClientConfig.placeOrder("123");
+
+    Assertions.assertEquals("Order placed", result);
+}
+```
+
+### `@Spy`
+
+`@Spy` wraps a real object. Real methods execute by default unless you override their behavior.
+
+- Use it when you want real behavior for most methods but want to stub selected methods.
+- A spy can be used with `Mockito.doNothing()`, `Mockito.doReturn()` and `Mockito.doThrow()`.
+
+```java
+@Spy
+OrderService orderService;
+
+@Test
+void spyTest() {
+    Mockito.doNothing()
+           .when(orderService)
+           .cancelOrder("123");
+
+    orderService.cancelOrder("123");
+
+    Mockito.verify(orderService).cancelOrder("123");
+}
+```
+
+For a class with constructor dependencies, use `@Spy` with `@InjectMocks` and mocked dependencies, or construct the spy explicitly.
+
+### Mock vs Spy
+
+| Feature | Mock | Spy |
+|---|---|---|
+| Object behavior | Mock behavior by default | Real behavior by default |
+| Real methods execute? | No, unless configured with custom answers | Yes, unless stubbed |
+| `when().thenReturn()` | Usually suitable | May execute the real method during stubbing |
+| `doReturn()` / `doNothing()` | Supported | Supported; especially useful for stubbing spies |
+| Typical purpose | Isolate dependencies | Partially mock an object |
+| Example | Mock Feign client | Spy on `OrderService` |
+
+**Interview tip:** Prefer mocks for dependencies and a real object for the class under test. Use spies only when there is a specific reason.
+
+---
+
+## 2. JUnit 5 Test Lifecycle
+
+Test lifecycle annotations control what runs before and after test methods.
+
+| Annotation | Execution | Purpose |
+|---|---|---|
+| `@BeforeAll` | Once before all tests | Initialize shared resources |
+| `@BeforeEach` | Before each test | Prepare test data |
+| `@Test` | Executes a test | Verify behavior |
+| `@AfterEach` | After each test | Clean up test data |
+| `@AfterAll` | Once after all tests | Release shared resources |
+
+### Example
+
+```java
+import org.junit.jupiter.api.*;
+
+class OrderServiceTest {
+
+    @BeforeAll
+    static void beforeAll() {
+        System.out.println("Before all tests");
+    }
+
+    @BeforeEach
+    void beforeEach() {
+        System.out.println("Before each test");
+    }
+
+    @Test
+    void testOne() {
+        System.out.println("Test one");
+    }
+
+    @Test
+    void testTwo() {
+        System.out.println("Test two");
+    }
+
+    @AfterEach
+    void afterEach() {
+        System.out.println("After each test");
+    }
+
+    @AfterAll
+    static void afterAll() {
+        System.out.println("After all tests");
+    }
+}
+```
+
+### Execution flow
+
+```text
+@BeforeAll
+    |
+@BeforeEach
+    |
+@Test (testOne or testTwo)
+    |
+@AfterEach
+    |
+@BeforeEach
+    |
+@Test (the other test)
+    |
+@AfterEach
+    |
+@AfterAll
+```
+
+The order of test methods is not guaranteed unless you configure test ordering. `@BeforeAll` and `@AfterAll` are static by default; using `@TestInstance(TestInstance.Lifecycle.PER_CLASS)` allows non-static lifecycle methods.
+
+**Interview tip:** `@BeforeEach` is commonly used to set up test data, while `@AfterEach` is used to clean up resources.
+
+---
+
+## 3. Mockito `doNothing()`
+
+`Mockito.doNothing()` configures a void method on a mock or spy to do nothing when called.
+
+### Example from `OrderService`
+
+Suppose the service has this method:
+
+```java
+public void cancelOrder(String productId) {
+    System.out.println("Cancel order: " + productId);
+}
+```
+
+### Test using a spy
+
+```java
+@Spy
+@InjectMocks
+OrderService orderService;
+
+@Test
+void testDoNothing() {
+
+    Mockito.doNothing()
+           .when(orderService)
+           .cancelOrder("123");
+
+    orderService.cancelOrder("123");
+
+    Mockito.verify(orderService)
+           .cancelOrder("123");
+}
+```
+
+Here, the real `cancelOrder()` implementation is suppressed, so the `println` statement is not executed.
+
+### Important points
+
+- `doNothing()` is intended for void methods.
+- Mockito mocks already do nothing by default for void methods, so explicitly configuring it is often unnecessary on a mock.
+- `doNothing()` is particularly useful when stubbing a void method on a spy.
+- You cannot use `doNothing()` on a regular real object; it must be a mock or spy.
+
+Related methods:
+
+```java
+Mockito.doReturn("Order placed")
+       .when(orderServiceSpy)
+       .someStringMethod();
+
+Mockito.doThrow(new RuntimeException("Failed"))
+       .when(orderServiceSpy)
+       .cancelOrder("123");
+```
+
+Use `doReturn()` for a method with a return value and `doThrow()` to make a void method throw an exception.
+
+---
+
+## 4. Testing a Private Method Using Reflection
+
+Normally, private methods should be tested indirectly through public methods. Java Reflection can call a private method directly when you specifically need to do so.
+
+### Private method in `OrderService`
+
+```java
+private String validateProductId(String productId) {
+
+    if (productId == null || productId.isBlank()) {
+        throw new IllegalArgumentException(
+                "Product ID cannot be null or blank");
+    }
+
+    return productId.trim();
+}
+```
+
+### Test the private method
+
+```java
+import java.lang.reflect.Method;
+
+@Test
+void testPrivateMethod() throws Exception {
+
+    Method method = OrderService.class
+            .getDeclaredMethod("validateProductId", String.class);
+
+    method.setAccessible(true);
+
+    Object result = method.invoke(orderService, " 123 ");
+
+    Assertions.assertEquals("123", result);
+}
+```
+
+### How it works
+
+1. `getDeclaredMethod()` finds a method declared in the class, including private methods.
+2. `setAccessible(true)` attempts to allow reflective access.
+3. `invoke()` executes the method on the supplied object.
+4. The returned result can be checked using JUnit assertions.
+
+`setAccessible(true)` can be restricted by Java module boundaries.
+
+**Interview tip:** Reflection can test private methods, but it couples tests to implementation details. Prefer testing through public methods or extracting complex logic into a separate class.
+
+---
+
+## 5. Testing Exceptions with `assertThrows()`
+
+JUnit 5's `Assertions.assertThrows()` verifies that an operation throws an expected exception type.
+
+### Test the public method
+
+```java
+@Test
+void testNullProductIdException() {
+
+    IllegalArgumentException exception =
+            Assertions.assertThrows(
+                    IllegalArgumentException.class,
+                    () -> orderService.placeOrder(null)
+            );
+
+    Assertions.assertEquals(
+            "Product ID cannot be null or blank",
+            exception.getMessage()
+    );
+
+    Mockito.verifyNoInteractions(feignClientConfig);
+}
+```
+
+This assumes `placeOrder()` calls `validateProductId()` before calling Feign.
+
+### Test the private method through Reflection
+
+Reflection wraps exceptions thrown by the invoked method in `InvocationTargetException`.
+
+```java
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+
+@Test
+void testPrivateMethodException() throws Exception {
+
+    Method method = OrderService.class
+            .getDeclaredMethod("validateProductId", String.class);
+
+    method.setAccessible(true);
+
+    InvocationTargetException exception =
+            Assertions.assertThrows(
+                    InvocationTargetException.class,
+                    () -> method.invoke(orderService, (Object) null)
+            );
+
+    Throwable actualException = exception.getCause();
+
+    Assertions.assertInstanceOf(
+            IllegalArgumentException.class,
+            actualException
+    );
+
+    Assertions.assertEquals(
+            "Product ID cannot be null or blank",
+            actualException.getMessage()
+    );
+}
+```
+
+### Why do we use `getCause()`?
+
+The private method throws `IllegalArgumentException`, but reflection wraps it in `InvocationTargetException`.
+
+```text
+method.invoke()
+      |
+      v
+InvocationTargetException
+      |
+      v
+getCause()
+      |
+      v
+IllegalArgumentException
+```
+
+Therefore, check the original exception's type and message using `exception.getCause()`.
+
+### Other exception assertions
+
+| Assertion | Purpose |
+|---|---|
+| `assertThrows()` | Verifies an expected exception type is thrown |
+| `assertThrowsExactly()` | Verifies the exact exception class |
+| `assertDoesNotThrow()` | Verifies that the operation completes without an exception |
+| `assertInstanceOf()` | Verifies an object's type |
+
+Example:
+
+```java
+Assertions.assertDoesNotThrow(
+        () -> orderService.placeOrder("123")
+);
+```
+
+For a successful test, configure the mocked Feign dependency to return a value if needed.
+
+---
+
+## 6. Quick Revision — Interview Questions
+
+**Q1. What is the difference between `@Mock` and `@Spy`?**
+
+`@Mock` provides mock behavior by default; `@Spy` calls real methods by default unless stubbed.
+
+**Q2. Why does `@InjectMocks` not make an object a mock?**
+
+It creates or uses a real instance of the class and injects the available Mockito mocks or spies into it.
+
+**Q3. Why does `doNothing()` fail with `NotAMockException`?**
+
+Because the object passed to `when()` is neither a mock nor a spy.
+
+**Q4. Can we test private methods?**
+
+Yes, reflection can invoke them, but testing through public methods is generally preferred.
+
+**Q5. Why does reflection produce `InvocationTargetException`?**
+
+It wraps exceptions thrown by the method being invoked. The original exception is available through `getCause()`.
+
+**Q6. What is the difference between `assertThrows()` and `assertDoesNotThrow()`?**
+
+`assertThrows()` verifies that an expected exception occurs; `assertDoesNotThrow()` verifies that the operation completes without an exception.
+
+**Q7. What is the difference between `@BeforeEach` and `@BeforeAll`?**
+
+`@BeforeEach` runs before every test method; `@BeforeAll` runs once before all test methods in the class.
+
+---
+
+## Final Best Practices
+
+- Use `@Mock` for external dependencies, such as Feign clients.
+- Use `@InjectMocks` to construct the real service under test.
+- Use `@Spy` only when partial mocking is necessary.
+- Use `assertThrows()` for expected exceptions.
+- Use reflection for private-method testing only when there is a good reason.
+- Prefer testing observable public behavior rather than implementation details.
+- Use `@BeforeEach` to prepare test-specific state and `@AfterEach` to clean it up.
+```
