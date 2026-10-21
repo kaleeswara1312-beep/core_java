@@ -2636,26 +2636,842 @@ These annotations are used to override beans with mocks in Spring tests, dependi
 
 # 16. Common Spring Boot Interview Questions
 
-1. What is `@SpringBootApplication` and which annotations does it combine?
-2. What happens internally when `SpringApplication.run()` executes?
-3. What is the difference between `@Component`, `@Service`, and `@Repository`?
-4. What is dependency injection? Why is constructor injection recommended?
-5. What happens when multiple beans of the same type exist?
-6. What is the difference between `@Bean` and `@Component`?
-7. How does Spring Boot auto-configuration work?
-8. How can you override Spring Boot's default configuration?
-9. What is the difference between `@Controller` and `@RestController`?
-10. What is the difference between `@RequestParam` and `@PathVariable`?
-11. How does `@RequestBody` convert JSON into a Java object?
-12. How does validation work with `@Valid`?
-13. How do `@ControllerAdvice` and `@ExceptionHandler` work together?
-14. What does `@Transactional` do? What are its limitations?
-15. What is the difference between singleton and prototype scope?
-16. What are `@PostConstruct` and `@PreDestroy` used for?
-17. How do `@Scheduled` and `@Async` work?
-18. How do `@Cacheable`, `@CachePut`, and `@CacheEvict` differ?
-19. How do `@PreAuthorize` and `@PostAuthorize` differ?
-20. What is the difference between `@SpringBootTest` and `@WebMvcTest`?
+# Spring Boot Interview Questions and Answers
+
+## 1. What is `@SpringBootApplication` and which annotations does it combine?
+
+**Answer:**
+
+`@SpringBootApplication` is the main annotation used to start and configure a Spring Boot application. It combines three annotations:
+
+- `@SpringBootConfiguration` — identifies the class as a source of Spring configuration.
+- `@EnableAutoConfiguration` — enables Spring Boot's auto-configuration mechanism.
+- `@ComponentScan` — scans packages for Spring-managed components.
+
+**Example:**
+
+```java
+@SpringBootApplication
+public class StudentApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(StudentApplication.class, args);
+    }
+}
+```
+
+**Interview point:** Place the main application class in a root package so that component scanning can discover components in its subpackages.
+
+---
+
+## 2. What happens internally when `SpringApplication.run()` executes?
+
+**Answer:**
+
+`SpringApplication.run()` bootstraps the Spring Boot application, prepares the environment, creates the application context, loads and configures beans, and starts the embedded web server for a web application.
+
+**Simplified flow:**
+
+1. Creates and prepares the `SpringApplication` runtime.
+2. Prepares the application environment and loads configuration properties.
+3. Creates the appropriate `ApplicationContext`.
+4. Registers bean definitions and processes configuration classes.
+5. Performs component scanning and evaluates auto-configuration conditions.
+6. Creates and initializes singleton beans, including dependency injection.
+7. Refreshes the application context.
+8. Starts the embedded web server, such as Tomcat, for a servlet-based web application.
+9. Publishes application events and runs applicable startup runners.
+
+**Example:**
+
+```java
+public static void main(String[] args) {
+    SpringApplication.run(StudentApplication.class, args);
+}
+```
+
+**Interview point:** The exact internal sequence varies by Spring Boot version and application type. Bean creation and web-server startup involve multiple lifecycle steps, not just one operation.
+
+---
+
+## 3. What is the difference between `@Component`, `@Service`, and `@Repository`?
+
+**Answer:**
+
+All three identify classes as Spring-managed components when component scanning is configured appropriately, but they communicate different responsibilities.
+
+| Annotation | Purpose | Example |
+|---|---|---|
+| `@Component` | General-purpose component | Utility class |
+| `@Service` | Business logic | StudentService |
+| `@Repository` | Data-access layer | StudentRepository |
+
+**Example:**
+
+```java
+@Component
+public class EmailUtil {
+}
+
+@Service
+public class StudentService {
+}
+
+@Repository
+public class StudentDao {
+}
+```
+
+**Why use separate annotations?**
+
+They make the application easier to understand and maintain. `@Repository` also participates in persistence exception translation when the required infrastructure is configured.
+
+**Interview point:** `@Service` and `@Repository` are specialized forms of `@Component`.
+
+---
+
+## 4. What is Dependency Injection? Why is constructor injection recommended?
+
+**Answer:**
+
+Dependency Injection (DI) is a technique in which Spring supplies an object with the dependencies it needs instead of the object creating those dependencies itself.
+
+**Example:**
+
+```java
+@Service
+public class StudentService {
+    public String getStudent() {
+        return "Student details";
+    }
+}
+
+@RestController
+public class StudentController {
+
+    private final StudentService studentService;
+
+    public StudentController(StudentService studentService) {
+        this.studentService = studentService;
+    }
+}
+```
+
+Spring creates or obtains the `StudentService` bean and injects it into the controller.
+
+**Why prefer constructor injection?**
+
+- Makes required dependencies explicit.
+- Allows fields to be `final`.
+- Makes unit testing easier.
+- Prevents the object from being constructed without its required dependencies.
+- Helps reveal tightly coupled designs.
+
+**Interview point:** With a single constructor, Spring does not require `@Autowired` on that constructor.
+
+---
+
+## 5. What happens when multiple beans of the same type exist?
+
+**Answer:**
+
+If Spring finds multiple candidates for a single-valued dependency, it uses resolution rules such as qualifiers and primary candidates. If the ambiguity cannot be resolved, application startup or dependency resolution can fail.
+
+**Solution 1: `@Qualifier`**
+
+```java
+@Component("emailNotification")
+class EmailNotification implements Notification {
+}
+
+@Component("smsNotification")
+class SmsNotification implements Notification {
+}
+
+@Service
+class NotificationService {
+
+    private final Notification notification;
+
+    NotificationService(
+            @Qualifier("emailNotification")
+            Notification notification) {
+        this.notification = notification;
+    }
+}
+```
+
+**Solution 2: `@Primary`**
+
+```java
+@Component
+@Primary
+class EmailNotification implements Notification {
+}
+```
+
+**Difference:**
+
+- `@Primary` identifies a preferred candidate.
+- `@Qualifier` narrows the selection to a specifically qualified candidate.
+
+**Real-world example:** An application supports email and SMS notifications. Use `@Qualifier` to select the required implementation.
+
+---
+
+## 6. What is the difference between `@Bean` and `@Component`?
+
+**Answer:**
+
+`@Component` marks a class for component scanning, whereas `@Bean` marks a method whose returned object should be registered in the Spring container.
+
+**Using `@Component`:**
+
+```java
+@Component
+public class EmailService {
+}
+```
+
+**Using `@Bean`:**
+
+```java
+@Configuration
+public class AppConfig {
+
+    @Bean
+    public Clock clock() {
+        return Clock.systemUTC();
+    }
+}
+```
+
+**When to use each?**
+
+- `@Component`: for classes that you own and want Spring to discover through scanning.
+- `@Bean`: for explicit object creation, third-party classes, or customized configuration.
+
+**Interview point:** Both approaches can register Spring-managed beans. They differ in how the bean is declared and created.
+
+---
+
+## 7. How does Spring Boot auto-configuration work?
+
+**Answer:**
+
+Spring Boot auto-configuration attempts to configure application infrastructure based on dependencies available on the classpath, existing beans, configuration properties, and conditional rules.
+
+**Example:**
+
+When Spring MVC dependencies are present and the relevant conditions are satisfied, Spring Boot can configure MVC infrastructure.
+
+When a supported database driver and appropriate configuration are available, Boot can configure a `DataSource`.
+
+**Important annotations:**
+
+- `@EnableAutoConfiguration`
+- `@ConditionalOnClass`
+- `@ConditionalOnMissingBean`
+- `@ConditionalOnProperty`
+
+**Simplified flow:**
+
+1. Spring Boot discovers applicable auto-configuration classes.
+2. It evaluates their conditions.
+3. Matching configuration classes contribute bean definitions.
+4. The application can customize or replace supported defaults.
+
+**Interview point:** Auto-configuration does not mean Spring Boot configures everything unconditionally. Configuration depends on the conditions of each feature.
+
+---
+
+## 8. How can you override Spring Boot's default configuration?
+
+**Answer:**
+
+You can override default behavior using application properties, custom beans, configuration classes, and other supported extension points.
+
+**Method 1: Application properties**
+
+```properties
+server.port=9090
+spring.application.name=student-service
+```
+
+This changes the embedded server port and application name.
+
+**Method 2: Define a custom bean**
+
+```java
+@Configuration
+public class AppConfig {
+
+    @Bean
+    @ConditionalOnMissingBean
+    public Clock clock() {
+        return Clock.systemUTC();
+    }
+}
+```
+
+This provides a default `Clock` bean if no matching bean exists.
+
+**Method 3: Define an application-specific bean**
+
+When an auto-configuration uses `@ConditionalOnMissingBean`, a suitable application-defined bean can cause the default bean configuration to back off.
+
+**Interview point:** Whether a custom bean replaces a default depends on the specific auto-configuration and its conditions. Not every default can be overridden in the same way.
+
+---
+
+## 9. What is the difference between `@Controller` and `@RestController`?
+
+**Answer:**
+
+`@Controller` is commonly used for Spring MVC controllers that return view names. `@RestController` combines `@Controller` and `@ResponseBody`, so handler return values are written to the response body by default.
+
+**Using `@Controller`:**
+
+```java
+@Controller
+public class HomeController {
+
+    @GetMapping("/home")
+    public String home() {
+        return "home";
+    }
+}
+```
+
+This typically resolves the `home` view.
+
+**Using `@RestController`:**
+
+```java
+@RestController
+public class StudentController {
+
+    @GetMapping("/student")
+    public Student getStudent() {
+        return new Student(1, "Ravi");
+    }
+}
+```
+
+The returned object is serialized to the HTTP response body, commonly as JSON.
+
+**Interview point:** Use `@RestController` for REST APIs and `@Controller` for view-based MVC applications. A `@Controller` method can also return a response body when annotated with `@ResponseBody`.
+
+---
+
+## 10. What is the difference between `@RequestParam` and `@PathVariable`?
+
+**Answer:**
+
+`@RequestParam` reads a request parameter, while `@PathVariable` reads a value from the URI path.
+
+**Using `@PathVariable`:**
+
+```java
+@GetMapping("/students/{id}")
+public String getStudent(@PathVariable Long id) {
+    return "Student ID: " + id;
+}
+```
+
+Request:
+
+```text
+GET /students/10
+```
+
+**Using `@RequestParam`:**
+
+```java
+@GetMapping("/students")
+public String searchStudent(@RequestParam String name) {
+    return "Student name: " + name;
+}
+```
+
+Request:
+
+```text
+GET /students?name=Ravi
+```
+
+**Interview point:**
+
+- Path variable: commonly identifies a particular resource.
+- Request parameter: commonly supplies filtering, searching, pagination, or optional request values.
+
+---
+
+## 11. How does `@RequestBody` convert JSON into a Java object?
+
+**Answer:**
+
+`@RequestBody` tells Spring MVC to read the HTTP request body and convert it into a Java object using an appropriate `HttpMessageConverter`. For JSON, a Jackson-based converter is commonly used when Jackson is available and configured.
+
+**Example:**
+
+```java
+public class Student {
+    private Long id;
+    private String name;
+
+    public Student() {
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+}
+```
+
+Controller:
+
+```java
+@PostMapping("/students")
+public Student createStudent(@RequestBody Student student) {
+    return student;
+}
+```
+
+Request body:
+
+```json
+{
+  "id": 1,
+  "name": "Ravi"
+}
+```
+
+**Internal flow:**
+
+1. The client sends a request with a JSON body.
+2. Spring MVC selects the appropriate message converter.
+3. Jackson deserializes the JSON into a `Student` object.
+4. Spring passes the object to the controller method.
+
+**Interview point:** Invalid JSON or incompatible data types can cause a request-body conversion error.
+
+---
+
+## 12. How does validation work with `@Valid`?
+
+**Answer:**
+
+`@Valid` triggers Bean Validation for a supported object argument. Constraints such as `@NotBlank`, `@NotNull`, and `@Size` define the validation rules.
+
+**Example:**
+
+```java
+public class Student {
+
+    @NotBlank(message = "Name is required")
+    private String name;
+
+    @Email(message = "Enter a valid email")
+    private String email;
+
+    // Getters and setters
+}
+```
+
+Controller:
+
+```java
+@PostMapping("/students")
+public ResponseEntity<Student> createStudent(
+        @Valid @RequestBody Student student) {
+    return ResponseEntity.status(201).body(student);
+}
+```
+
+**Internal flow:**
+
+1. Spring converts the request body into a Java object.
+2. `@Valid` triggers validation of the object's constraints.
+3. If validation fails, Spring MVC normally raises a validation exception.
+4. The application can return meaningful validation errors using centralized exception handling.
+
+**Important:** Include a validation implementation in the project, commonly through `spring-boot-starter-validation`.
+
+**Interview point:** `@Valid` triggers validation; the constraint annotations define what is valid.
+
+---
+
+## 13. How do `@ControllerAdvice` and `@ExceptionHandler` work together?
+
+**Answer:**
+
+`@ControllerAdvice` allows exception handling logic to be shared across controllers. `@ExceptionHandler` identifies a method that handles specified exceptions.
+
+For REST APIs, `@RestControllerAdvice` is often convenient because its return values are written to the response body.
+
+**Example:**
+
+```java
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+
+    @ExceptionHandler(StudentNotFoundException.class)
+    public ResponseEntity<String> handleNotFound(
+            StudentNotFoundException ex) {
+
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body(ex.getMessage());
+    }
+}
+```
+
+**Internal flow:**
+
+1. A controller or service operation throws an exception.
+2. Spring MVC's exception-resolution mechanism looks for a suitable handler.
+3. A matching `@ExceptionHandler` method processes the exception.
+4. The handler returns an appropriate HTTP response.
+
+**When to use:** To avoid repeating exception-handling code across multiple controllers.
+
+**Interview point:** A global handler can handle common exceptions, while a controller-specific handler can handle exceptions for a particular controller.
+
+---
+
+## 14. What does `@Transactional` do? What are its limitations?
+
+**Answer:**
+
+`@Transactional` declares transaction semantics for a method or class. Spring typically implements declarative transaction management using AOP proxies and a configured transaction manager.
+
+**Example:**
+
+```java
+@Service
+public class StudentService {
+
+    private final StudentRepository repository;
+
+    public StudentService(StudentRepository repository) {
+        this.repository = repository;
+    }
+
+    @Transactional
+    public void createStudent(Student student) {
+        repository.save(student);
+        // Other related database operations
+    }
+}
+```
+
+**Why use it?**
+
+If several database operations belong to one business operation, they may need to succeed or roll back together.
+
+**Limitations and interview points:**
+
+1. In the usual proxy-based setup, self-invocation does not trigger transactional advice.
+2. By default, unchecked exceptions and errors trigger rollback; checked exceptions do not automatically trigger rollback.
+3. The behavior depends on the configured transaction manager and resource.
+4. A database transaction does not automatically make remote API calls part of the same atomic transaction.
+5. Long-running transactions can hold database resources and locks longer than necessary.
+6. Transaction propagation and isolation settings influence transaction behavior.
+
+**Interview point:** `@Transactional` is not a universal guarantee that every operation in a method will be rolled back. Understand rollback rules, proxy behavior, and transaction boundaries.
+
+---
+
+## 15. What is the difference between singleton and prototype scope?
+
+**Answer:**
+
+Singleton scope creates one bean instance per bean definition per Spring container. Prototype scope creates a new instance whenever Spring is asked to resolve that bean for creation.
+
+| Feature | Singleton | Prototype |
+|---|---|---|
+| Default scope | Yes | No |
+| Instance creation | One per bean definition per container | New instance for each container creation request |
+| Typical use | Stateless services | Objects that need independent instances |
+| Lifecycle management | Spring manages creation and destruction callbacks | Spring manages creation but does not normally manage the full destruction lifecycle |
+
+**Example:**
+
+```java
+@Component
+@Scope("singleton")
+public class StudentService {
+}
+```
+
+```java
+@Component
+@Scope("prototype")
+public class ReportGenerator {
+}
+```
+
+**Important:** Singleton beans are not automatically thread-safe. Also, injecting a prototype bean directly into a singleton usually resolves the prototype only when the singleton is created, unless a provider or another suitable mechanism is used.
+
+---
+
+## 16. What are `@PostConstruct` and `@PreDestroy` used for?
+
+**Answer:**
+
+- `@PostConstruct`: executes an initialization callback after dependency injection and before the bean is put into normal service.
+- `@PreDestroy`: executes a destruction callback when Spring destroys the bean, provided its lifecycle is managed appropriately.
+
+**Example:**
+
+```java
+@Component
+public class DatabaseManager {
+
+    @PostConstruct
+    public void initialize() {
+        System.out.println("Initialize resources");
+    }
+
+    @PreDestroy
+    public void cleanup() {
+        System.out.println("Clean up resources");
+    }
+}
+```
+
+**When to use:**
+
+- `@PostConstruct`: validate configuration or initialize resources.
+- `@PreDestroy`: release resources or perform cleanup.
+
+**Interview point:** These callbacks are part of the bean lifecycle. `@PreDestroy` is not guaranteed to run after abrupt process termination.
+
+**Package note:** In modern Spring Boot applications, use `jakarta.annotation.PostConstruct` and `jakarta.annotation.PreDestroy`.
+
+---
+
+## 17. How do `@Scheduled` and `@Async` work?
+
+**Answer:**
+
+`@Scheduled` runs a method according to a schedule. `@Async` allows a method invocation to execute asynchronously using a configured Spring task executor.
+
+### `@Scheduled` example
+
+```java
+@Configuration
+@EnableScheduling
+public class SchedulingConfig {
+}
+
+@Component
+public class ReportScheduler {
+
+    @Scheduled(fixedRate = 60000)
+    public void generateReport() {
+        System.out.println("Generating report");
+    }
+}
+```
+
+The method is scheduled at a 60-second fixed rate.
+
+### `@Async` example
+
+```java
+@Configuration
+@EnableAsync
+public class AsyncConfig {
+}
+
+@Service
+public class EmailService {
+
+    @Async
+    public CompletableFuture<String> sendEmail() {
+        return CompletableFuture.completedFuture("Email sent");
+    }
+}
+```
+
+**Differences:**
+
+- `@Scheduled`: determines when a task runs.
+- `@Async`: determines that an invocation can run asynchronously.
+
+**Interview points:**
+
+- Enable the corresponding feature with `@EnableScheduling` or `@EnableAsync`.
+- Configure a suitable thread pool for production workloads.
+- Proxy-based asynchronous execution generally does not apply to self-invocation.
+- Handle exceptions appropriately, especially for asynchronous methods without a returned future.
+
+---
+
+## 18. How do `@Cacheable`, `@CachePut`, and `@CacheEvict` differ?
+
+**Answer:**
+
+These annotations support declarative caching through Spring's cache abstraction.
+
+### `@Cacheable`
+
+Uses a cached result when the key matches an existing entry; otherwise, it executes the method and normally stores the result.
+
+```java
+@Cacheable(value = "students", key = "#id")
+public Student getStudent(Long id) {
+    return repository.findById(id).orElseThrow();
+}
+```
+
+### `@CachePut`
+
+Executes the method and updates the cache with the returned value.
+
+```java
+@CachePut(value = "students", key = "#student.id")
+public Student updateStudent(Student student) {
+    return repository.save(student);
+}
+```
+
+### `@CacheEvict`
+
+Removes an entry or entries from the cache.
+
+```java
+@CacheEvict(value = "students", key = "#id")
+public void deleteStudent(Long id) {
+    repository.deleteById(id);
+}
+```
+
+**Quick comparison:**
+
+| Annotation | Behavior |
+|---|---|
+| `@Cacheable` | May skip method execution on a cache hit |
+| `@CachePut` | Executes the method and updates the cache |
+| `@CacheEvict` | Removes cached entries |
+
+**Interview point:** Enable caching and configure an appropriate cache manager. Cache invalidation and stale data are important real-world concerns.
+
+---
+
+## 19. How do `@PreAuthorize` and `@PostAuthorize` differ?
+
+**Answer:**
+
+Both support method-level authorization in Spring Security, but they evaluate authorization at different stages.
+
+### `@PreAuthorize`
+
+Checks the authorization expression before method execution.
+
+```java
+@PreAuthorize("hasRole('ADMIN')")
+public void deleteStudent(Long id) {
+}
+```
+
+The method requires the caller to have the `ADMIN` role.
+
+### `@PostAuthorize`
+
+Checks the authorization expression after method execution and before returning the result to the caller.
+
+```java
+@PostAuthorize(
+    "returnObject.owner == authentication.name"
+)
+public Student getStudent(Long id) {
+    return repository.findById(id).orElseThrow();
+}
+```
+
+The expression checks whether the returned student's owner matches the authenticated username.
+
+**Differences:**
+
+- `@PreAuthorize`: authorizes access before the method runs.
+- `@PostAuthorize`: checks the result after the method runs.
+
+**Important:** Enable method security using `@EnableMethodSecurity`. With `@PostAuthorize`, the method may already have performed database operations or other side effects before authorization fails.
+
+---
+
+## 20. What is the difference between `@SpringBootTest` and `@WebMvcTest`?
+
+**Answer:**
+
+`@SpringBootTest` loads a broader application context for integration testing, whereas `@WebMvcTest` loads a focused Spring MVC test slice.
+
+### `@SpringBootTest`
+
+```java
+@SpringBootTest
+class StudentApplicationTests {
+
+    @Test
+    void applicationStarts() {
+    }
+}
+```
+
+**When to use:** For tests that require broad application configuration or interactions between multiple layers.
+
+### `@WebMvcTest`
+
+```java
+@WebMvcTest(StudentController.class)
+class StudentControllerTests {
+
+    @Autowired
+    private MockMvc mockMvc;
+}
+```
+
+**When to use:** For testing controller mappings, HTTP responses, serialization, and MVC behavior without loading the entire application.
+
+**Differences:**
+
+| Feature | `@SpringBootTest` | `@WebMvcTest` |
+|---|---|---|
+| Context | Broad application context | Focused MVC slice |
+| Controller testing | Supported | Main purpose |
+| Database/repository | May load if configured and discovered | Usually excluded unless explicitly added |
+| Speed | Often slower | Usually faster |
+| Dependencies | Real application beans where configured | Collaborators are commonly mocked |
+
+**Interview point:** Use `@WebMvcTest` for focused web-layer tests and `@SpringBootTest` when broader application integration needs to be verified.
+
+---
+
+# Final Interview Preparation Strategy
+
+For each question, prepare these four points:
+
+1. **Definition:** What does it mean?
+2. **Purpose:** Why do we need it?
+3. **Internal working:** What happens inside Spring?
+4. **Real-world example:** Where would you use it in a project?
+
+Do not memorize only annotation definitions. Interviewers often ask follow-up questions about default behavior, configuration conditions, proxy limitations, error handling, and practical use cases.
 
 ---
 
