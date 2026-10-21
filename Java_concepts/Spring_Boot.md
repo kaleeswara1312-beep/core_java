@@ -1222,6 +1222,7 @@ They are commonly used in Spring Boot auto-configuration to decide whether a bea
 | `@ConditionalOnMissingBean` | Applies when a matching bean is not already available. |
 | `@ConditionalOnBean` | Applies when a matching bean is available. |
 | `@ConditionalOnProperty` | Applies based on a configuration property's value. |
+| `@ConditionalOnExpression` | Applies when a Spring Expression Language (SpEL) expression evaluates to `true`. |
 
 ### Example: `@ConditionalOnProperty`
 
