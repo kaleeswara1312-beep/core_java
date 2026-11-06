@@ -1,0 +1,1175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Java Multithreading Visualizer: synchronized vs ReentrantLock</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+    
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #0b0f19;
+      color: #e2e8f0;
+    }
+    
+    .font-mono {
+      font-family: 'Fira Code', monospace;
+    }
+
+    /* Custom Glassmorphism Styling */
+    .glass-card {
+      background: rgba(17, 24, 39, 0.7);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    }
+    
+    .glass-nav {
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    /* Animated Locks & Nodes */
+    .thread-node {
+      transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .pulse-glow {
+      box-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
+    }
+
+    .pulse-glow-amber {
+      box-shadow: 0 0 25px rgba(245, 158, 11, 0.6);
+    }
+
+    .pulse-glow-red {
+      box-shadow: 0 0 25px rgba(239, 68, 68, 0.7);
+    }
+
+    /* Custom Scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.6);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(51, 65, 85, 0.8);
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(71, 85, 105, 1);
+    }
+
+    /* Code Line Highlighting */
+    .code-line {
+      transition: background-color 0.2s ease, border-left 0.2s ease;
+      border-left: 3px solid transparent;
+      padding-left: 0.5rem;
+    }
+    .code-line.active {
+      background-color: rgba(59, 130, 246, 0.2);
+      border-left-color: #3b82f6;
+    }
+    .code-line.active-err {
+      background-color: rgba(239, 68, 68, 0.25);
+      border-left-color: #ef4444;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between overflow-x-hidden">
+
+  <!-- TOP BAR / HEADER -->
+  <header class="glass-nav sticky top-0 z-50 px-6 py-3 flex flex-wrap justify-between items-center gap-4">
+    <div class="flex items-center space-x-3">
+      <div class="p-2 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-lg text-white shadow-lg">
+        <i class="fa-solid me-0 fa-cubes-stacked text-xl"></i>
+      </div>
+      <div>
+        <h1 class="text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-indigo-300 to-purple-400">
+          Java Concurrency Visualizer
+        </h1>
+        <p class="text-xs text-slate-400">Deep Dive: <span class="text-sky-400 font-mono">synchronized</span> vs <span class="text-purple-400 font-mono">ReentrantLock</span></p>
+      </div>
+    </div>
+
+    <!-- MAIN TABS -->
+    <div class="flex bg-slate-900/80 p-1 rounded-xl border border-slate-800 text-sm font-medium">
+      <button id="tab-sync" onclick="switchMode('sync')" class="px-4 py-1.5 rounded-lg text-sky-400 bg-slate-800 shadow transition-all duration-200">
+        <i class="fa-solid fa-lock text-xs mr-1.5"></i>synchronized
+      </button>
+      <button id="tab-reentrant" onclick="switchMode('reentrant')" class="px-4 py-1.5 rounded-lg text-slate-400 hover:text-slate-200 transition-all duration-200">
+        <i class="fa-solid fa-key text-xs mr-1.5"></i>ReentrantLock
+      </button>
+      <button id="tab-matrix" onclick="switchMode('matrix')" class="px-4 py-1.5 rounded-lg text-slate-400 hover:text-slate-200 transition-all duration-200">
+        <i class="fa-solid fa-table-cells text-xs mr-1.5"></i>Comparison Matrix
+      </button>
+    </div>
+  </header>
+
+  <!-- CONTENT CONTAINER -->
+  <main class="flex-grow p-4 lg:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 max-w-[1920px] mx-auto w-full">
+
+    <!-- SIMULATION VIEW (VISUALIZER & CODE PANEL) -->
+    <div id="view-simulations" class="col-span-12 grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+      <!-- LEFT SIDEBAR: SCENARIOS & CONTROLS -->
+      <div class="lg:col-span-4 flex flex-col gap-5">
+        
+        <!-- SCENARIO SELECTOR CARD -->
+        <div class="glass-card p-5 rounded-2xl">
+          <h2 class="text-xs font-semibold tracking-wider text-slate-400 uppercase mb-3 flex items-center justify-between">
+            <span>Select Scenario</span>
+            <span id="scenario-badge" class="px-2 py-0.5 rounded text-[10px] bg-blue-500/20 text-blue-400 font-mono">Intrinsic Lock</span>
+          </h2>
+
+          <!-- Sub-scenarios dropdown/buttons for Synchronized -->
+          <div id="scenarios-sync" class="space-y-2">
+            <button onclick="loadScenario('sync_basic')" id="btn-sync_basic" class="w-full text-left p-3 rounded-xl border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 text-sm font-medium transition flex items-center justify-between">
+              <div>
+                <div class="text-slate-200">Standard Synchronized Flow</div>
+                <div class="text-xs text-slate-400 font-normal">Monitor acquisition, contention, release</div>
+              </div>
+              <i class="fa-solid fa-chevron-right text-xs text-blue-400"></i>
+            </button>
+            <button onclick="loadScenario('sync_exception')" id="btn-sync_exception" class="w-full text-left p-3 rounded-xl border border-slate-800 bg-slate-900/50 hover:bg-slate-800/50 text-sm font-medium transition flex items-center justify-between">
+              <div>
+                <div class="text-slate-200">Exception Handling</div>
+                <div class="text-xs text-slate-400 font-normal">Automatic lock release on RuntimeException</div>
+              </div>
+              <i class="fa-solid fa-chevron-right text-xs text-slate-500"></i>
+            </button>
+          </div>
+
+          <!-- Sub-scenarios for ReentrantLock -->
+          <div id="scenarios-reentrant" class="space-y-2 hidden">
+            <button onclick="loadScenario('reentrant_basic')" id="btn-reentrant_basic" class="w-full text-left p-2.5 rounded-xl border border-purple-500/30 bg-purple-500/10 text-sm font-medium transition">
+              <div class="text-slate-200">Explicit lock() & try-finally</div>
+              <div class="text-xs text-slate-400 font-normal">Manual locking and safe cleanup pattern</div>
+            </button>
+            <button onclick="loadScenario('reentrant_trylock')" id="btn-reentrant_trylock" class="w-full text-left p-2.5 rounded-xl border border-slate-800 bg-slate-900/50 hover:bg-slate-800/50 text-sm font-medium transition">
+              <div class="text-slate-200">Non-blocking tryLock(timeout)</div>
+              <div class="text-xs text-slate-400 font-normal">Thread-2 timeouts gracefully without blocking</div>
+            </button>
+            <button onclick="loadScenario('reentrant_interrupt')" id="btn-reentrant_interrupt" class="w-full text-left p-2.5 rounded-xl border border-slate-800 bg-slate-900/50 hover:bg-slate-800/50 text-sm font-medium transition">
+              <div class="text-slate-200">lockInterruptibly()</div>
+              <div class="text-xs text-slate-400 font-normal">Canceling a thread waiting in queue</div>
+            </button>
+            <button onclick="loadScenario('reentrant_fairness')" id="btn-reentrant_fairness" class="w-full text-left p-2.5 rounded-xl border border-slate-800 bg-slate-900/50 hover:bg-slate-800/50 text-sm font-medium transition">
+              <div class="text-slate-200">Fair Lock (FIFO Queue)</div>
+              <div class="text-xs text-slate-400 font-normal">Strict FIFO grant vs Non-fair barging</div>
+            </button>
+            <button onclick="loadScenario('reentrant_bug')" id="btn-reentrant_bug" class="w-full text-left p-2.5 rounded-xl border border-slate-800 bg-slate-900/50 hover:bg-slate-800/50 text-sm font-medium transition">
+              <div class="text-slate-200 text-rose-300">Bug: Forgotten unlock()</div>
+              <div class="text-xs text-slate-400 font-normal">Leaked lock leading to thread starvation</div>
+            </button>
+          </div>
+        </div>
+
+        <!-- EXECUTION CONTROLS CARD -->
+        <div class="glass-card p-5 rounded-2xl flex flex-col gap-4">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold tracking-wider text-slate-400 uppercase">Execution Controls</span>
+            <span id="step-counter" class="text-xs font-mono text-slate-400 bg-slate-800 px-2.5 py-1 rounded-full border border-slate-700">Step 0 / 0</span>
+          </div>
+
+          <div class="grid grid-cols-4 gap-2">
+            <button id="btn-prev" onclick="prevStep()" class="p-3 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl transition flex justify-center items-center font-medium disabled:opacity-40 disabled:cursor-not-allowed">
+              <i class="fa-solid fa-backward-step"></i>
+            </button>
+            <button id="btn-play" onclick="togglePlay()" class="p-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition flex justify-center items-center font-medium shadow-lg shadow-blue-600/30">
+              <i class="fa-solid fa-play" id="play-icon"></i>
+            </button>
+            <button id="btn-next" onclick="nextStep()" class="p-3 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl transition flex justify-center items-center font-medium disabled:opacity-40 disabled:cursor-not-allowed">
+              <i class="fa-solid fa-forward-step"></i>
+            </button>
+            <button id="btn-reset" onclick="resetSimulation()" class="p-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition flex justify-center items-center font-medium">
+              <i class="fa-solid fa-rotate-left"></i>
+            </button>
+          </div>
+
+          <!-- Speed Control -->
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-slate-800">
+            <span class="text-xs text-slate-400 flex items-center gap-1.5">
+              <i class="fa-solid fa-gauge-high"></i> Speed
+            </span>
+            <div class="flex flex-wrap gap-1 text-xs">
+              <button onclick="setSpeed(3000, this)" class="speed-btn px-2 py-1 rounded bg-slate-800 text-slate-300 hover:bg-slate-700 font-mono">0.25x</button>
+              <button onclick="setSpeed(1500, this)" class="speed-btn px-2 py-1 rounded bg-slate-800 text-slate-300 hover:bg-slate-700 font-mono">0.5x</button>
+              <button onclick="setSpeed(900, this)" class="speed-btn px-2 py-1 rounded bg-blue-600 text-white font-medium font-mono">1x</button>
+              <button onclick="setSpeed(600, this)" class="speed-btn px-2 py-1 rounded bg-slate-800 text-slate-300 hover:bg-slate-700 font-mono">1.5x</button>
+              <button onclick="setSpeed(400, this)" class="speed-btn px-2 py-1 rounded bg-slate-800 text-slate-300 hover:bg-slate-700 font-mono">2x</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- CODE SNIPPET DISPLAY PANEL -->
+        <div class="glass-card p-4 rounded-2xl flex flex-col flex-grow min-h-[300px]">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-semibold tracking-wider text-slate-400 uppercase flex items-center gap-2">
+              <i class="fa-solid fa-code text-blue-400"></i> Java Source Code
+            </span>
+            <span class="text-[11px] font-mono text-slate-500">ThreadSafeCounter.java</span>
+          </div>
+          <div id="code-container" class="bg-slate-950 p-3 rounded-xl border border-slate-900 font-mono text-xs overflow-x-auto text-slate-300 flex-grow leading-relaxed">
+            <!-- Dynamic code lines inserted by JS -->
+          </div>
+        </div>
+
+      </div>
+
+      <!-- RIGHT MAIN AREA: VISUALIZER & INTERNAL EXPLANATION -->
+      <div class="lg:col-span-8 flex flex-col gap-5">
+        
+        <!-- VISUAL ANIMATION CANVAS / BENCH -->
+        <div class="glass-card p-6 rounded-2xl flex flex-col justify-between min-h-[440px] relative overflow-hidden">
+          
+          <!-- THREADS TOP HEADER / STATE BARS -->
+          <div class="grid grid-cols-3 gap-4 mb-6">
+            <!-- Thread 1 -->
+            <div id="card-t1" class="bg-slate-900/80 p-3 rounded-xl border border-cyan-500/30 flex items-center justify-between transition-all">
+              <div class="flex items-center gap-2">
+                <span class="w-3 h-3 rounded-full bg-cyan-400 animate-pulse"></span>
+                <span class="text-xs font-bold text-cyan-400 font-mono">Thread-1</span>
+              </div>
+              <span id="state-t1" class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">NEW</span>
+            </div>
+            <!-- Thread 2 -->
+            <div id="card-t2" class="bg-slate-900/80 p-3 rounded-xl border border-purple-500/30 flex items-center justify-between transition-all">
+              <div class="flex items-center gap-2">
+                <span class="w-3 h-3 rounded-full bg-purple-400 animate-pulse"></span>
+                <span class="text-xs font-bold text-purple-400 font-mono">Thread-2</span>
+              </div>
+              <span id="state-t2" class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">NEW</span>
+            </div>
+            <!-- Thread 3 -->
+            <div id="card-t3" class="bg-slate-900/80 p-3 rounded-xl border border-pink-500/30 flex items-center justify-between transition-all">
+              <div class="flex items-center gap-2">
+                <span class="w-3 h-3 rounded-full bg-pink-400 animate-pulse"></span>
+                <span class="text-xs font-bold text-pink-400 font-mono">Thread-3</span>
+              </div>
+              <span id="state-t3" class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">NEW</span>
+            </div>
+          </div>
+
+          <!-- MIDDLE VISUAL ARENA -->
+          <div class="relative my-auto py-6 grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
+            
+            <!-- LEFT: THREAD NODES ARENA -->
+            <div class="md:col-span-5 flex flex-col gap-4 items-center justify-center">
+              <div id="thread-arena" class="w-full flex flex-col gap-3">
+                <!-- Dynamic Nodes -->
+              </div>
+            </div>
+
+            <!-- CENTER & RIGHT: LOCK OBJECT & SHARED RESOURCE CONTAINER -->
+            <div class="md:col-span-7 bg-slate-950/60 p-5 rounded-2xl border border-slate-800/80 flex flex-col gap-4 relative">
+              
+              <!-- SHARED RESOURCE HEADER -->
+              <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                <div class="flex items-center gap-2 text-xs font-semibold text-slate-300">
+                  <i class="fa-solid fa-database text-indigo-400"></i>
+                  <span>Shared Heap Memory Resource</span>
+                </div>
+                <div id="resource-val-badge" class="font-mono text-xs text-emerald-400 bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-800/50">
+                  counter = 0
+                </div>
+              </div>
+
+              <!-- PHYSICAL LOCK OBJECT VISUAL -->
+              <div id="lock-physical-box" class="p-4 rounded-xl border-2 border-slate-700 bg-slate-900/90 flex flex-col gap-3 transition-all duration-300">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-2.5">
+                    <div id="lock-icon-bg" class="w-9 h-9 rounded-lg bg-slate-800 text-slate-400 flex items-center justify-center text-lg transition-all">
+                      <i id="lock-icon" class="fa-solid fa-lock-open"></i>
+                    </div>
+                    <div>
+                      <div id="lock-title" class="text-sm font-bold text-slate-200">Intrinsic Monitor Lock</div>
+                      <div id="lock-owner-text" class="text-[11px] text-slate-400 font-mono">Owner: Unlocked</div>
+                    </div>
+                  </div>
+                  <!-- Internal JVM Register Status Badge -->
+                  <div class="text-right">
+                    <span id="lock-state-badge" class="text-[10px] font-mono px-2 py-1 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                      MarkWord: 0x0 (Unlocked)
+                    </span>
+                  </div>
+                </div>
+
+                <!-- QUEUE VISUALIZER (Object EntrySet or AQS SyncQueue) -->
+                <div class="mt-2 pt-2 border-t border-slate-800/80">
+                  <div class="flex items-center justify-between text-[11px] text-slate-400 mb-1.5">
+                    <span id="queue-label" class="font-mono">Monitor EntrySet (Wait Queue):</span>
+                    <span id="queue-count" class="font-mono text-slate-500">0 threads waiting</span>
+                  </div>
+                  <div id="queue-container" class="min-h-[42px] bg-slate-950/80 rounded-lg border border-slate-800/60 p-2 flex items-center gap-2 overflow-x-auto">
+                    <span class="text-xs text-slate-600 italic px-2">Queue is empty</span>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+
+          <!-- BOTTOM JVM INTERNAL STEP EXPLANATION BAR -->
+          <div class="mt-4 p-4 rounded-xl bg-slate-900/90 border border-slate-800 flex items-start gap-3">
+            <div class="p-2 bg-blue-500/10 text-blue-400 rounded-lg mt-0.5">
+              <i class="fa-solid fa-microchip text-base"></i>
+            </div>
+            <div class="flex-grow">
+              <div class="flex items-center justify-between">
+                <h4 class="text-xs font-semibold text-slate-300 uppercase tracking-wider">JVM Internal Execution Mechanics</h4>
+                <span id="step-tag" class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400">Idle</span>
+              </div>
+              <p id="explanation-text" class="text-xs text-slate-300 mt-1 leading-relaxed">
+                Select a scenario and click Play or Step Forward to visualize JVM thread scheduling and monitor lock transitions.
+              </p>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- EXECUTION TIMELINE LOG -->
+        <div class="glass-card p-4 rounded-2xl flex flex-col gap-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold tracking-wider text-slate-400 uppercase flex items-center gap-2">
+              <i class="fa-solid fa-timeline text-indigo-400"></i> Event Timeline Log
+            </span>
+            <button onclick="clearTimeline()" class="text-[11px] text-slate-500 hover:text-slate-300 font-mono">Clear Log</button>
+          </div>
+          <div id="timeline-log" class="h-28 overflow-y-auto space-y-1.5 font-mono text-xs pr-1">
+            <!-- Timeline entries auto-inserted -->
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- COMPARISON MATRIX TAB VIEW -->
+    <div id="view-matrix" class="col-span-12 hidden">
+      <div class="glass-card p-6 rounded-2xl space-y-6">
+        <div>
+          <h2 class="text-xl font-bold text-slate-100 flex items-center gap-2">
+            <i class="fa-solid fa-table-cells text-indigo-400"></i> Side-by-Side Architecture Comparison
+          </h2>
+          <p class="text-sm text-slate-400 mt-1">Deep architectural evaluation of Java intrinsic monitors vs ReentrantLock utilities.</p>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm text-slate-300 border-collapse">
+            <thead>
+              <tr class="border-b border-slate-800 bg-slate-900/60 text-xs font-mono text-slate-400 uppercase">
+                <th class="p-4">Feature / Concept</th>
+                <th class="p-4 text-sky-400">synchronized (Intrinsic Lock)</th>
+                <th class="p-4 text-purple-400">ReentrantLock (java.util.concurrent)</th>
+              </div>
+            </thead>
+            <tbody class="divide-y divide-slate-800/60 font-normal">
+              <tr class="hover:bg-slate-800/30 transition">
+                <td class="p-4 font-semibold text-slate-200">Lock Mechanism</td>
+                <td class="p-4">Intrinsic Java Object Monitor (Mark Word in Object Header).</td>
+                <td class="p-4">Explicit Lock object backed by AbstractQueuedSynchronizer (AQS).</td>
+              </tr>
+              <tr class="hover:bg-slate-800/30 transition">
+                <td class="p-4 font-semibold text-slate-200">Acquisition & Release</td>
+                <td class="p-4">Automatic (implicit at block enter/exit or method boundary).</td>
+                <td class="p-4">Explicit via <code class="text-purple-300 font-mono">lock()</code> and <code class="text-purple-300 font-mono">unlock()</code> (requires try-finally).</td>
+              </tr>
+              <tr class="hover:bg-slate-800/30 transition">
+                <td class="p-4 font-semibold text-slate-200">Exception Safety</td>
+                <td class="p-4"><span class="text-emerald-400">Guaranteed</span> by JVM bytecodes (<code class="font-mono text-xs">monitorexit</code> executed automatically).</td>
+                <td class="p-4"><span class="text-amber-400">Manual</span>. Missing <code class="font-mono text-xs">unlock()</code> in finally block causes permanent lock leak.</td>
+              </tr>
+              <tr class="hover:bg-slate-800/30 transition">
+                <td class="p-4 font-semibold text-slate-200">Non-blocking Try Lock</td>
+                <td class="p-4 text-slate-500">Not supported. Threads block indefinitely.</td>
+                <td class="p-4"><span class="text-emerald-400">Supported</span> via <code class="text-purple-300 font-mono">tryLock()</code> / <code class="text-purple-300 font-mono">tryLock(timeout, unit)</code>.</td>
+              </tr>
+              <tr class="hover:bg-slate-800/30 transition">
+                <td class="p-4 font-semibold text-slate-200">Interruptibility</td>
+                <td class="p-4 text-slate-500">Uninterruptible. Blocked threads ignore thread interrupts.</td>
+                <td class="p-4"><span class="text-emerald-400">Supported</span> via <code class="text-purple-300 font-mono">lockInterruptibly()</code>. Responds immediately to interrupts.</td>
+              </tr>
+              <tr class="hover:bg-slate-800/30 transition">
+                <td class="p-4 font-semibold text-slate-200">Fairness Selection</td>
+                <td class="p-4 text-slate-500">Non-fair only. No FIFO ordering guarantees.</td>
+                <td class="p-4"><span class="text-emerald-400">Configurable</span> (<code class="text-purple-300 font-mono">new ReentrantLock(true)</code> enforces strict FIFO order).</td>
+              </tr>
+              <tr class="hover:bg-slate-800/30 transition">
+                <td class="p-4 font-semibold text-slate-200">Condition Queues</td>
+                <td class="p-4">Single WaitSet per object (<code class="font-mono text-xs">wait()/notify()</code>).</td>
+                <td class="p-4">Multiple condition objects per lock (<code class="text-purple-300 font-mono">lock.newCondition()</code>).</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="border-t border-slate-900 bg-slate-950 py-3 text-center text-xs text-slate-500">
+    Java Multithreading Architecture & JVM Internals Simulation Engine &bull; Built for Interactive Learning
+  </footer>
+
+  <!-- APPLICATION LOGIC SCRIPT -->
+  <script>
+    // --- GLOBAL SCENARIOS DEFINITION ---
+    const SCENARIOS = {
+      // Synchronized Scenarios
+      sync_basic: {
+        mode: 'sync',
+        title: 'Standard Synchronized Flow',
+        code: [
+          "public class Counter {",
+          "  private int count = 0;",
+          "  private final Object lock = new Object();",
+          "",
+          "  public void increment() {",
+          "    synchronized(lock) { // Thread acquires monitor",
+          "      count++;           // Critical section execution",
+          "    }                    // Automatic monitor release",
+          "  }",
+          "}"
+        ],
+        steps: [
+          {
+            line: 5,
+            threads: { t1: 'RUNNABLE', t2: 'RUNNABLE', t3: 'RUNNABLE' },
+            lockOwner: null,
+            queue: [],
+            explanation: "All three threads are RUNNABLE and attempt to enter the synchronized(lock) block concurrently.",
+            log: "Threads T1, T2, T3 invoked increment() and compete for intrinsic lock."
+          },
+          {
+            line: 5,
+            threads: { t1: 'RUNNABLE', t2: 'BLOCKED', t3: 'BLOCKED' },
+            lockOwner: 't1',
+            queue: ['t2', 't3'],
+            explanation: "Thread-1 successfully performs Atomic CAS on object header Mark Word. Thread-2 & Thread-3 fail CAS, get BLOCKED and are appended to the Object Monitor EntrySet.",
+            log: "Thread-1 acquired intrinsic monitor lock. Thread-2 & Thread-3 transitioned to BLOCKED state."
+          },
+          {
+            line: 6,
+            threads: { t1: 'RUNNABLE', t2: 'BLOCKED', t3: 'BLOCKED' },
+            lockOwner: 't1',
+            queue: ['t2', 't3'],
+            resourceValue: "count = 1",
+            explanation: "Thread-1 holds the monitor lock and safely executes the critical section, incrementing count to 1.",
+            log: "Thread-1 executed critical section: count updated to 1."
+          },
+          {
+            line: 7,
+            threads: { t1: 'TERMINATED', t2: 'RUNNABLE', t3: 'BLOCKED' },
+            lockOwner: 't2',
+            queue: ['t3'],
+            explanation: "Thread-1 exits block; JVM executes bytecode 'monitorexit'. Lock automatically assigned to Thread-2 from EntrySet (unparked).",
+            log: "Thread-1 released lock and completed. Thread-2 unparked and acquired lock!"
+          },
+          {
+            line: 6,
+            threads: { t1: 'TERMINATED', t2: 'RUNNABLE', t3: 'BLOCKED' },
+            lockOwner: 't2',
+            queue: ['t3'],
+            resourceValue: "count = 2",
+            explanation: "Thread-2 executes the critical section without interference.",
+            log: "Thread-2 executed critical section: count updated to 2."
+          },
+          {
+            line: 7,
+            threads: { t1: 'TERMINATED', t2: 'TERMINATED', t3: 'RUNNABLE' },
+            lockOwner: 't3',
+            queue: [],
+            explanation: "Thread-2 completes and releases monitor. Thread-3 acquires lock.",
+            log: "Thread-2 released lock. Thread-3 acquired lock."
+          },
+          {
+            line: 6,
+            threads: { t1: 'TERMINATED', t2: 'TERMINATED', t3: 'RUNNABLE' },
+            lockOwner: 't3',
+            queue: [],
+            resourceValue: "count = 3",
+            explanation: "Thread-3 executes critical section.",
+            log: "Thread-3 updated count to 3."
+          },
+          {
+            line: 7,
+            threads: { t1: 'TERMINATED', t2: 'TERMINATED', t3: 'TERMINATED' },
+            lockOwner: null,
+            queue: [],
+            explanation: "All threads completed execution safely. Monitor is unlocked.",
+            log: "All threads completed execution. Intrinsic monitor released."
+          }
+        ]
+      },
+
+      sync_exception: {
+        mode: 'sync',
+        title: 'Exception Handling in Synchronized',
+        code: [
+          "public void safeOperation() {",
+          "  synchronized(lock) {",
+          "    count++;",
+          "    if (count == 1) {",
+          "      throw new RuntimeException(\"Error!\");",
+          "    }",
+          "  } // Exception table ensures implicit release",
+          "}"
+        ],
+        steps: [
+          {
+            line: 1,
+            threads: { t1: 'RUNNABLE', t2: 'BLOCKED', t3: 'BLOCKED' },
+            lockOwner: 't1',
+            queue: ['t2', 't3'],
+            explanation: "Thread-1 acquires intrinsic monitor. Thread-2 & Thread-3 are BLOCKED in queue.",
+            log: "Thread-1 acquired monitor lock."
+          },
+          {
+            line: 4,
+            threads: { t1: 'RUNNABLE', t2: 'BLOCKED', t3: 'BLOCKED' },
+            lockOwner: 't1',
+            queue: ['t2', 't3'],
+            resourceValue: "count = 1",
+            isErrLine: true,
+            explanation: "Thread-1 encounters a RuntimeException inside synchronized block!",
+            log: "Thread-1 threw RuntimeException in critical section."
+          },
+          {
+            line: 6,
+            threads: { t1: 'TERMINATED', t2: 'RUNNABLE', t3: 'BLOCKED' },
+            lockOwner: 't2',
+            queue: ['t3'],
+            explanation: "JVM Exception Table intercepts exception & triggers implicit 'monitorexit'. Lock is automatically freed to prevent deadlocks!",
+            log: "JVM exception handler automatically executed monitorexit. Lock transferred to Thread-2."
+          },
+          {
+            line: 2,
+            threads: { t1: 'TERMINATED', t2: 'TERMINATED', t3: 'TERMINATED' },
+            lockOwner: null,
+            queue: [],
+            explanation: "Remaining threads execute safely. Intrinsic locks guarantee cleanup even on fatal exceptions.",
+            log: "All threads finished safely despite earlier exception."
+          }
+        ]
+      },
+
+      // ReentrantLock Scenarios
+      reentrant_basic: {
+        mode: 'reentrant',
+        title: 'Explicit lock() with try-finally',
+        code: [
+          "ReentrantLock lock = new ReentrantLock();",
+          "public font-mono void doWork() {",
+          "  lock.lock(); // Explicit acquisition",
+          "  try {",
+          "    count++;  // Protected state change",
+          "  } finally {",
+          "    lock.unlock(); // Explicit release",
+          "  }",
+          "}"
+        ],
+        steps: [
+          {
+            line: 2,
+            threads: { t1: 'RUNNABLE', t2: 'WAITING', t3: 'WAITING' },
+            lockOwner: 't1',
+            queue: ['t2', 't3'],
+            explanation: "Thread-1 calls lock.lock(), updating AQS state = 1. Thread-2 & Thread-3 are parked in AQS Sync Queue (WAITING state).",
+            log: "Thread-1 acquired ReentrantLock (AQS State = 1). T2 & T3 queued in AQS."
+          },
+          {
+            line: 4,
+            threads: { t1: 'RUNNABLE', t2: 'WAITING', t3: 'WAITING' },
+            lockOwner: 't1',
+            queue: ['t2', 't3'],
+            resourceValue: "count = 1",
+            explanation: "Thread-1 modifies shared resource inside try block.",
+            log: "Thread-1 executed critical section safely."
+          },
+          {
+            line: 6,
+            threads: { t1: 'TERMINATED', t2: 'RUNNABLE', t3: 'WAITING' },
+            lockOwner: 't2',
+            queue: ['t3'],
+            explanation: "Thread-1 calls lock.unlock() in finally block. AQS sets state = 0 and unparks Thread-2 via LockSupport.unpark().",
+            log: "Thread-1 unlocked. Thread-2 unparked from AQS and acquired lock."
+          },
+          {
+            line: 6,
+            threads: { t1: 'TERMINATED', t2: 'TERMINATED', t3: 'TERMINATED' },
+            lockOwner: null,
+            queue: [],
+            resourceValue: "count = 3",
+            explanation: "All threads gracefully acquire and release lock via try-finally pattern.",
+            log: "Execution sequence complete. AQS sync queue empty."
+          }
+        ]
+      },
+
+      reentrant_trylock: {
+        mode: 'reentrant',
+        title: 'Non-blocking tryLock(timeout)',
+        code: [
+          "public void attemptAccess() {",
+          "  // Try acquiring lock with 500ms timeout",
+          "  if (lock.tryLock(500, TimeUnit.MS)) {",
+          "    try { count++; }",
+          "    finally { lock.unlock(); }",
+          "  } else {",
+          "    // Fallback if lock busy (no blocking!)",
+          "    log(\"Lock busy, skipping\");",
+          "  }",
+          "}"
+        ],
+        steps: [
+          {
+            line: 2,
+            threads: { t1: 'RUNNABLE', t2: 'TIMED_WAITING', t3: 'WAITING' },
+            lockOwner: 't1',
+            queue: ['t2', 't3'],
+            explanation: "Thread-1 holds lock. Thread-2 executes tryLock(500ms) and enters TIMED_WAITING state rather than infinite blocking.",
+            log: "Thread-1 holds lock. Thread-2 initiated timed tryLock(500ms)."
+          },
+          {
+            line: 7,
+            threads: { t1: 'RUNNABLE', t2: 'RUNNABLE', t3: 'WAITING' },
+            lockOwner: 't1',
+            queue: ['t3'],
+            explanation: "500ms timeout expires for Thread-2 while Thread-1 is still working. tryLock() returns false! Thread-2 avoids blocking.",
+            log: "Thread-2 timed out on tryLock() -> returned false. Avoided thread blocking!"
+          },
+          {
+            line: 8,
+            threads: { t1: 'RUNNABLE', t2: 'TERMINATED', t3: 'WAITING' },
+            lockOwner: 't1',
+            queue: ['t3'],
+            explanation: "Thread-2 executes fallback logic immediately and terminates cleanly without thread contention.",
+            log: "Thread-2 executed alternative fallback path and finished gracefully."
+          },
+          {
+            line: 4,
+            threads: { t1: 'TERMINATED', t2: 'TERMINATED', t3: 'TERMINATED' },
+            lockOwner: null,
+            queue: [],
+            explanation: "Thread-1 finishes and unlocks. Thread-3 acquires lock next.",
+            log: "Simulation complete. tryLock prevented Thread-2 from locking up."
+          }
+        ]
+      },
+
+      reentrant_interrupt: {
+        mode: 'reentrant',
+        title: 'lockInterruptibly() Cancellation',
+        code: [
+          "public void doInterruptibleWork() throws InterruptedException {",
+          "  lock.lockInterruptibly(); // Can be cancelled!",
+          "  try {",
+          "    count++;",
+          "  } finally {",
+          "    lock.unlock();",
+          "  }",
+          "}"
+        ],
+        steps: [
+          {
+            line: 1,
+            threads: { t1: 'RUNNABLE', t2: 'WAITING', t3: 'WAITING' },
+            lockOwner: 't1',
+            queue: ['t2', 't3'],
+            explanation: "Thread-1 holds lock. Thread-2 & Thread-3 are parked in AQS queue waiting interruptibly.",
+            log: "Thread-1 holds lock. Thread-3 waiting in queue via lockInterruptibly()."
+          },
+          {
+            line: 1,
+            threads: { t1: 'RUNNABLE', t2: 'WAITING', t3: 'TERMINATED' },
+            lockOwner: 't1',
+            queue: ['t2'],
+            isErrLine: true,
+            explanation: "Main thread sends t3.interrupt()! Thread-3 wakes immediately, throws InterruptedException, exits AQS queue without lock!",
+            log: "Thread-3 received interrupt signal! Aborted lock acquisition & exited queue."
+          },
+          {
+            line: 4,
+            threads: { t1: 'TERMINATED', t2: 'TERMINATED', t3: 'TERMINATED' },
+            lockOwner: null,
+            queue: [],
+            explanation: "Thread-1 completes, lock passes to Thread-2. Thread-3 responded to cancellation safely.",
+            log: "lockInterruptibly() allowed clean thread cancellation."
+          }
+        ]
+      },
+
+      reentrant_fairness: {
+        mode: 'reentrant',
+        title: 'Fair Lock (Strict FIFO Ordering)',
+        code: [
+          "// Fair Lock guarantees strict FIFO queue grant",
+          "ReentrantLock lock = new ReentrantLock(true);",
+          "",
+          "public void accessResource() {",
+          "  lock.lock();",
+          "  try { count++; }",
+          "  finally { lock.unlock(); }",
+          "}"
+        ],
+        steps: [
+          {
+            line: 4,
+            threads: { t1: 'RUNNABLE', t2: 'WAITING', t3: 'WAITING' },
+            lockOwner: 't1',
+            queue: ['t2', 't3'],
+            explanation: "Fair lock instantiated. Thread-2 arrived first at queue, followed by Thread-3.",
+            log: "Fair lock enabled. Queue order locked as: [Thread-2, Thread-3]."
+          },
+          {
+            line: 6,
+            threads: { t1: 'TERMINATED', t2: 'RUNNABLE', t3: 'WAITING' },
+            lockOwner: 't2',
+            queue: ['t3'],
+            explanation: "Thread-1 unlocks. Fair lock inspects AQS head -> strictly grants lock to longest-waiting thread (Thread-2). Barging prevented!",
+            log: "Fair Lock granted lock strictly to Thread-2 (head of FIFO queue)."
+          },
+          {
+            line: 6,
+            threads: { t1: 'TERMINATED', t2: 'TERMINATED', t3: 'RUNNABLE' },
+            lockOwner: 't3',
+            queue: [],
+            explanation: "Thread-2 completes and releases lock. Thread-3 is next in order.",
+            log: "Thread-3 acquired lock following strict FIFO sequence."
+          }
+        ]
+      },
+
+      reentrant_bug: {
+        mode: 'reentrant',
+        title: 'BUG: Forgotten unlock() (Deadlock)',
+        code: [
+          "public void brokenLockUsage() {",
+          "  lock.lock(); // Lock acquired",
+          "  count++;",
+          "  // BUG: Missing unlock() in finally block!",
+          "  // lock.unlock();",
+          "}"
+        ],
+        steps: [
+          {
+            line: 1,
+            threads: { t1: 'RUNNABLE', t2: 'WAITING', t3: 'WAITING' },
+            lockOwner: 't1',
+            queue: ['t2', 't3'],
+            explanation: "Thread-1 acquires ReentrantLock (AQS State = 1). Thread-2 & Thread-3 enter waiting queue.",
+            log: "Thread-1 acquired lock."
+          },
+          {
+            line: 2,
+            threads: { t1: 'TERMINATED', t2: 'WAITING', t3: 'WAITING' },
+            lockOwner: 't1',
+            queue: ['t2', 't3'],
+            isErrLine: true,
+            explanation: "CRITICAL BUG: Thread-1 exits method without calling lock.unlock()! AQS state remains stuck at 1.",
+            log: "BUG DETECTED: Thread-1 terminated without releasing lock!"
+          },
+          {
+            line: 4,
+            threads: { t1: 'TERMINATED', t2: 'BLOCKED', t3: 'BLOCKED' },
+            lockOwner: 't1 (STUCK)',
+            queue: ['t2', 't3'],
+            isErrLine: true,
+            explanation: "THREAD STARVATION: Thread-2 & Thread-3 are trapped in WAITING state forever! Demonstrates why try-finally is MANDATORY for ReentrantLock.",
+            log: "PERMANENT DEADLOCK/STARVATION: Waiting threads locked out indefinitely!"
+          }
+        ]
+      }
+    };
+
+    // --- APPLICATION STATE ---
+    let currentMode = 'sync';
+    let currentScenarioKey = 'sync_basic';
+    let currentStepIdx = 0;
+    let isPlaying = false;
+    let playTimer = null;
+    let playSpeed = 900;
+
+    // --- INITIALIZATION ---
+    window.onload = function() {
+      loadScenario('sync_basic');
+    };
+
+    // --- MODE SWITCHING ---
+    function switchMode(mode) {
+      currentMode = mode;
+
+      // Update Header Tab styling
+      ['sync', 'reentrant', 'matrix'].forEach(m => {
+        const tab = document.getElementById(`tab-${m}`);
+        if (m === mode) {
+          tab.className = "px-4 py-1.5 rounded-lg text-sky-400 bg-slate-800 shadow transition-all duration-200 font-medium";
+        } else {
+          tab.className = "px-4 py-1.5 rounded-lg text-slate-400 hover:text-slate-200 transition-all duration-200";
+        }
+      });
+
+      // Toggle views
+      if (mode === 'matrix') {
+        document.getElementById('view-simulations').classList.add('hidden');
+        document.getElementById('view-matrix').classList.remove('hidden');
+        pauseSimulation();
+      } else {
+        document.getElementById('view-simulations').classList.remove('hidden');
+        document.getElementById('view-matrix').classList.add('hidden');
+        
+        // Show corresponding sidebar scenario buttons
+        if (mode === 'sync') {
+          document.getElementById('scenarios-sync').classList.remove('hidden');
+          document.getElementById('scenarios-reentrant').classList.add('hidden');
+          loadScenario('sync_basic');
+        } else {
+          document.getElementById('scenarios-sync').classList.add('hidden');
+          document.getElementById('scenarios-reentrant').classList.remove('hidden');
+          loadScenario('reentrant_basic');
+        }
+      }
+    }
+
+    // --- LOAD SCENARIO ---
+    function loadScenario(scenarioKey) {
+      pauseSimulation();
+      currentScenarioKey = scenarioKey;
+      currentStepIdx = 0;
+
+      const scenario = SCENARIOS[scenarioKey];
+
+      // Update active scenario button UI
+      const parentContainer = scenario.mode === 'sync' ? 'scenarios-sync' : 'scenarios-reentrant';
+      const buttons = document.getElementById(parentContainer).querySelectorAll('button');
+      buttons.forEach(btn => {
+        if (btn.id === `btn-${scenarioKey}`) {
+          btn.className = scenario.mode === 'sync' 
+            ? "w-full text-left p-3 rounded-xl border border-blue-500/40 bg-blue-500/15 text-sm font-medium transition flex items-center justify-between"
+            : "w-full text-left p-2.5 rounded-xl border border-purple-500/40 bg-purple-500/15 text-sm font-medium transition";
+        } else {
+          btn.className = scenario.mode === 'sync'
+            ? "w-full text-left p-3 rounded-xl border border-slate-800 bg-slate-900/50 hover:bg-slate-800/50 text-sm font-medium transition flex items-center justify-between"
+            : "w-full text-left p-2.5 rounded-xl border border-slate-800 bg-slate-900/50 hover:bg-slate-800/50 text-sm font-medium transition";
+        }
+      });
+
+      // Update Badge
+      const badge = document.getElementById('scenario-badge');
+      if (scenario.mode === 'sync') {
+        badge.innerText = "Intrinsic Monitor";
+        badge.className = "px-2 py-0.5 rounded text-[10px] bg-blue-500/20 text-blue-400 font-mono";
+      } else {
+        badge.innerText = "ReentrantLock (AQS)";
+        badge.className = "px-2 py-0.5 rounded text-[10px] bg-purple-500/20 text-purple-400 font-mono";
+      }
+
+      // Render Code
+      renderCode(scenario.code);
+
+      // Render Simulation Initial Step
+      renderStep();
+    }
+
+    // --- CODE DISPLAY RENDERER ---
+    function renderCode(codeLines) {
+      const container = document.getElementById('code-container');
+      container.innerHTML = '';
+      codeLines.forEach((lineText, idx) => {
+        const div = document.createElement('div');
+        div.id = `code-line-${idx + 1}`;
+        div.className = "code-line flex items-center gap-3";
+        div.innerHTML = `
+          <span class="text-slate-600 w-5 text-right font-mono text-[11px] select-none">${idx + 1}</span>
+          <span>${escapeHtml(lineText)}</span>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function escapeHtml(text) {
+      return text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/synchronized/g, `<span class="text-sky-400 font-semibold">synchronized</span>`)
+        .replace(/ReentrantLock/g, `<span class="text-purple-400 font-semibold">ReentrantLock</span>`)
+        .replace(/lock|unlock|tryLock|lockInterruptibly/g, `<span class="text-indigo-300 font-semibold">$&</span>`)
+        .replace(/try|finally|throw|new|if|else/g, `<span class="text-pink-400">$&</span>`);
+    }
+
+    // --- STEP RENDERER & VISUAL UPDATES ---
+    function renderStep() {
+      const scenario = SCENARIOS[currentScenarioKey];
+      const step = scenario.steps[currentStepIdx];
+
+      // Update Step Counter
+      document.getElementById('step-counter').innerText = `Step ${currentStepIdx + 1} / ${scenario.steps.length}`;
+
+      // Update Control Buttons state
+      document.getElementById('btn-prev').disabled = (currentStepIdx === 0);
+      document.getElementById('btn-next').disabled = (currentStepIdx === scenario.steps.length - 1);
+
+      // Update Line Highlight
+      document.querySelectorAll('.code-line').forEach(el => el.classList.remove('active', 'active-err'));
+      if (step.line) {
+        const activeLineEl = document.getElementById(`code-line-${step.line}`);
+        if (activeLineEl) {
+          activeLineEl.classList.add(step.isErrLine ? 'active-err' : 'active');
+        }
+      }
+
+      // Update Thread States
+      updateThread('t1', step.threads.t1);
+      updateThread('t2', step.threads.t2);
+      updateThread('t3', step.threads.t3);
+
+      // Update Arena Thread Visual Nodes
+      renderThreadArena(step);
+
+      // Update Lock Physical Object State
+      renderLockState(scenario.mode, step);
+
+      // Update Shared Resource
+      if (step.resourceValue) {
+        document.getElementById('resource-val-badge').innerText = step.resourceValue;
+      }
+
+      // Update Explanation Text
+      document.getElementById('explanation-text').innerText = step.explanation;
+      document.getElementById('step-tag').innerText = `Step ${currentStepIdx + 1}`;
+
+      // Append Timeline Log
+      if (step.log) {
+        addLogEntry(step.log);
+      }
+    }
+
+    // --- THREAD UI UPDATER ---
+    function updateThread(threadKey, state) {
+      const card = document.getElementById(`card-${threadKey}`);
+      const badge = document.getElementById(`state-${threadKey}`);
+      badge.innerText = state;
+
+      // Reset classes
+      badge.className = "text-[10px] font-mono px-2 py-0.5 rounded font-semibold border ";
+
+      switch (state) {
+        case 'RUNNABLE':
+          badge.className += "bg-emerald-950/80 text-emerald-400 border-emerald-800/80";
+          break;
+        case 'BLOCKED':
+          badge.className += "bg-rose-950/80 text-rose-400 border-rose-800/80";
+          break;
+        case 'WAITING':
+        case 'TIMED_WAITING':
+          badge.className += "bg-amber-950/80 text-amber-400 border-amber-800/80";
+          break;
+        case 'TERMINATED':
+          badge.className += "bg-slate-800 text-slate-500 border-slate-700";
+          break;
+        default:
+          badge.className += "bg-slate-800 text-slate-300 border-slate-700";
+      }
+    }
+
+    // --- ARENA THREAD NODES RENDERER ---
+    function renderThreadArena(step) {
+      const arena = document.getElementById('thread-arena');
+      arena.innerHTML = '';
+
+      const threads = [
+        { id: 't1', name: 'Thread-1', color: 'border-cyan-500 bg-cyan-950/60 text-cyan-300', dot: 'bg-cyan-400' },
+        { id: 't2', name: 'Thread-2', color: 'border-purple-500 bg-purple-950/60 text-purple-300', dot: 'bg-purple-400' },
+        { id: 't3', name: 'Thread-3', color: 'border-pink-500 bg-pink-950/60 text-pink-300', dot: 'bg-pink-400' }
+      ];
+
+      threads.forEach(t => {
+        const state = step.threads[t.id];
+        const isOwner = step.lockOwner && step.lockOwner.includes(t.id);
+        const inQueue = step.queue.includes(t.id);
+
+        const node = document.createElement('div');
+        node.className = `p-3 rounded-xl border ${t.color} flex items-center justify-between transition-all duration-300 ${isOwner ? 'ring-2 ring-emerald-400 scale-[1.02]' : ''}`;
+        
+        let positionBadge = '';
+        if (isOwner) {
+          positionBadge = `<span class="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded font-mono border border-emerald-500/40">Holding Lock</span>`;
+        } else if (inQueue) {
+          positionBadge = `<span class="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded font-mono border border-amber-500/40">In Wait Queue</span>`;
+        } else {
+          positionBadge = `<span class="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded font-mono">${state}</span>`;
+        }
+
+        node.innerHTML = `
+          <div class="flex items-center gap-2.5">
+            <span class="w-2.5 h-2.5 rounded-full ${t.dot}"></span>
+            <span class="text-xs font-bold font-mono">${t.name}</span>
+          </div>
+          ${positionBadge}
+        `;
+
+        arena.appendChild(node);
+      });
+    }
+
+    // --- LOCK STATE VISUAL RENDERER ---
+    function renderLockState(mode, step) {
+      const lockBox = document.getElementById('lock-physical-box');
+      const lockIcon = document.getElementById('lock-icon');
+      const lockIconBg = document.getElementById('lock-icon-bg');
+      const lockTitle = document.getElementById('lock-title');
+      const lockOwnerText = document.getElementById('lock-owner-text');
+      const lockStateBadge = document.getElementById('lock-state-badge');
+      const queueLabel = document.getElementById('queue-label');
+      const queueContainer = document.getElementById('queue-container');
+      const queueCount = document.getElementById('queue-count');
+
+      lockTitle.innerText = mode === 'sync' ? "Intrinsic Monitor Lock" : "ReentrantLock (AQS)";
+      queueLabel.innerText = mode === 'sync' ? "Monitor EntrySet (Wait Queue):" : "AQS Sync Queue (CLH Node Queue):";
+
+      if (step.lockOwner) {
+        lockBox.className = "p-4 rounded-xl border-2 border-emerald-500/60 bg-emerald-950/20 flex flex-col gap-3 transition-all duration-300 pulse-glow";
+        lockIcon.className = "fa-solid fa-lock text-emerald-400";
+        lockIconBg.className = "w-9 h-9 rounded-lg bg-emerald-900/50 text-emerald-300 flex items-center justify-center text-lg";
+        lockOwnerText.innerText = `Owner: ${step.lockOwner.toUpperCase()}`;
+        
+        lockStateBadge.innerText = mode === 'sync' 
+          ? `MarkWord: Locked [0x01]` 
+          : `AQS State: 1 (Held)`;
+        lockStateBadge.className = "text-[10px] font-mono px-2 py-1 rounded bg-emerald-900/50 text-emerald-300 border border-emerald-700";
+      } else {
+        lockBox.className = "p-4 rounded-xl border-2 border-slate-700 bg-slate-900/90 flex flex-col gap-3 transition-all duration-300";
+        lockIcon.className = "fa-solid fa-lock-open text-slate-400";
+        lockIconBg.className = "w-9 h-9 rounded-lg bg-slate-800 text-slate-400 flex items-center justify-center text-lg";
+        lockOwnerText.innerText = "Owner: Unlocked";
+
+        lockStateBadge.innerText = mode === 'sync' 
+          ? `MarkWord: Unlocked [0x00]` 
+          : `AQS State: 0 (Free)`;
+        lockStateBadge.className = "text-[10px] font-mono px-2 py-1 rounded bg-slate-800 text-slate-400 border border-slate-700";
+      }
+
+      // Render Queue
+      queueContainer.innerHTML = '';
+      if (step.queue && step.queue.length > 0) {
+        queueCount.innerText = `${step.queue.length} thread(s) waiting`;
+        step.queue.forEach((tId, idx) => {
+          const pill = document.createElement('div');
+          let colorClass = "bg-purple-900/40 text-purple-300 border-purple-700";
+          if (tId === 't1') colorClass = "bg-cyan-900/40 text-cyan-300 border-cyan-700";
+          if (tId === 't3') colorClass = "bg-pink-900/40 text-pink-300 border-pink-700";
+
+          pill.className = `px-2.5 py-1 rounded-md border text-xs font-mono font-semibold flex items-center gap-1.5 ${colorClass}`;
+          pill.innerHTML = `<span>[Head+${idx}]</span> <span>${tId.toUpperCase()}</span>`;
+          queueContainer.appendChild(pill);
+        });
+      } else {
+        queueCount.innerText = "0 threads waiting";
+        queueContainer.innerHTML = `<span class="text-xs text-slate-600 italic px-2">Queue is empty</span>`;
+      }
+    }
+
+    // --- LOG TIMELINE ---
+    function addLogEntry(text) {
+      const log = document.getElementById('timeline-log');
+      const time = new Date().toLocaleTimeString().split(' ')[0] + '.' + Math.floor(Math.random()*900 + 100);
+      
+      const entry = document.createElement('div');
+      entry.className = "text-slate-300 flex items-start gap-2 border-l-2 border-slate-800 pl-2 py-0.5 hover:bg-slate-900/50 rounded transition";
+      entry.innerHTML = `
+        <span class="text-slate-500 font-mono text-[10px] shrink-0">[${time}]</span>
+        <span class="leading-tight">${text}</span>
+      `;
+      log.appendChild(entry);
+      log.scrollTop = log.scrollHeight;
+    }
+
+    function clearTimeline() {
+      document.getElementById('timeline-log').innerHTML = '';
+    }
+
+    // --- CONTROLS: PLAY, PAUSE, NEXT, PREV, RESET ---
+    function togglePlay() {
+      if (isPlaying) {
+        pauseSimulation();
+      } else {
+        startSimulation();
+      }
+    }
+
+    function startSimulation() {
+      const scenario = SCENARIOS[currentScenarioKey];
+      if (currentStepIdx >= scenario.steps.length - 1) {
+        currentStepIdx = 0; // loop reset if at end
+      }
+      
+      isPlaying = true;
+      document.getElementById('play-icon').className = "fa-solid fa-pause";
+      document.getElementById('btn-play').className = "p-3 bg-amber-600 hover:bg-amber-500 text-white rounded-xl transition flex justify-center items-center font-medium shadow-lg shadow-amber-600/30";
+
+      playTimer = setInterval(() => {
+        if (currentStepIdx < scenario.steps.length - 1) {
+          currentStepIdx++;
+          renderStep();
+        } else {
+          pauseSimulation();
+        }
+      }, playSpeed);
+    }
+
+    function pauseSimulation() {
+      isPlaying = false;
+      if (playTimer) clearInterval(playTimer);
+      document.getElementById('play-icon').className = "fa-solid fa-play";
+      document.getElementById('btn-play').className = "p-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition flex justify-center items-center font-medium shadow-lg shadow-blue-600/30";
+    }
+
+    function nextStep() {
+      pauseSimulation();
+      const scenario = SCENARIOS[currentScenarioKey];
+      if (currentStepIdx < scenario.steps.length - 1) {
+        currentStepIdx++;
+        renderStep();
+      }
+    }
+
+    function prevStep() {
+      pauseSimulation();
+      if (currentStepIdx > 0) {
+        currentStepIdx--;
+        renderStep();
+      }
+    }
+
+    function resetSimulation() {
+      pauseSimulation();
+      currentStepIdx = 0;
+      renderStep();
+      addLogEntry("Simulation reset to initial state.");
+    }
+
+    function setSpeed(speedMs, btnEl) {
+      playSpeed = speedMs;
+      document.querySelectorAll('.speed-btn').forEach(b => {
+        b.className = "speed-btn px-2.5 py-1 rounded bg-slate-800 text-slate-300 hover:bg-slate-700";
+      });
+      btnEl.className = "speed-btn px-2.5 py-1 rounded bg-blue-600 text-white font-medium";
+
+      if (isPlaying) {
+        pauseSimulation();
+        startSimulation();
+      }
+    }
+  </script>
+</body>
+</html>

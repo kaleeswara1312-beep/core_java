@@ -1,0 +1,1161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Java Thread States & Life Cycle Visualizer</title>
+  <style>
+    /* CSS Reset & Base Styling */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: #0b0f19;
+      color: #e2e8f0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .font-mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+
+    /* Layout & Containers */
+    header {
+      background: rgba(15, 23, 42, 0.95);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 12px 24px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+
+    .header-title-box {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .header-icon {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, #a855f7, #6366f1, #3b82f6);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 20px;
+      color: #ffffff;
+      box-shadow: 0 4px 14px rgba(99, 102, 241, 0.4);
+    }
+
+    h1 {
+      font-size: 18px;
+      font-weight: 700;
+      background: linear-gradient(90deg, #c084fc, #34d399, #38bdf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .header-subtitle {
+      font-size: 12px;
+      color: #94a3b8;
+    }
+
+    /* Tabs Styling */
+    .tab-container {
+      display: flex;
+      background: #0f172a;
+      padding: 4px;
+      border-radius: 12px;
+      border: 1px solid #1e293b;
+      gap: 4px;
+    }
+
+    .tab-btn {
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      border: none;
+      background: transparent;
+      color: #94a3b8;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .tab-btn:hover {
+      color: #f1f5f9;
+    }
+
+    .tab-btn.active {
+      background: #1e293b;
+      color: #34d399;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+
+    /* Main Container */
+    main {
+      flex: 1;
+      padding: 20px;
+      max-width: 1800px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .grid-12 {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 20px;
+    }
+
+    @media (max-width: 1024px) {
+      .grid-12 {
+        display: flex;
+        flex-direction: column;
+      }
+    }
+
+    .col-4 { grid-column: span 4; }
+    .col-8 { grid-column: span 8; }
+    .col-12 { grid-column: span 12; }
+
+    /* Cards */
+    .glass-card {
+      background: rgba(15, 23, 42, 0.75);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.37);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .card-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #94a3b8;
+    }
+
+    .badge {
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+    }
+
+    .badge-purple { background: rgba(168, 85, 247, 0.2); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.4); }
+    .badge-emerald { background: rgba(52, 211, 153, 0.2); color: #34d399; border: 1px solid rgba(52, 211, 153, 0.4); }
+    .badge-amber { background: rgba(251, 191, 36, 0.2); color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.4); }
+    .badge-rose { background: rgba(244, 63, 94, 0.2); color: #f43f5e; border: 1px solid rgba(244, 63, 94, 0.4); }
+
+    /* Scenario Buttons */
+    .scenario-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .scen-btn {
+      width: 100%;
+      text-align: left;
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid #1e293b;
+      background: rgba(15, 23, 42, 0.5);
+      color: #e2e8f0;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .scen-btn:hover {
+      background: rgba(30, 41, 59, 0.8);
+      border-color: #334155;
+    }
+
+    .scen-btn.active {
+      border-color: rgba(168, 85, 247, 0.5);
+      background: rgba(168, 85, 247, 0.15);
+    }
+
+    .scen-btn-title {
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .scen-btn-desc {
+      font-size: 11px;
+      color: #94a3b8;
+      margin-top: 2px;
+    }
+
+    /* Execution Controls */
+    .controls-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+
+    .ctrl-btn {
+      padding: 12px;
+      border-radius: 10px;
+      border: none;
+      background: #1e293b;
+      color: #f1f5f9;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s;
+    }
+
+    .ctrl-btn:hover:not(:disabled) {
+      background: #334155;
+    }
+
+    .ctrl-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .ctrl-btn-primary {
+      background: #059669;
+      color: #ffffff;
+    }
+
+    .ctrl-btn-primary:hover:not(:disabled) {
+      background: #10b981;
+    }
+
+    .ctrl-btn-pause {
+      background: #d97706;
+      color: #ffffff;
+    }
+
+    /* Speed Control */
+    .speed-box {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 1px solid #1e293b;
+      padding-top: 10px;
+      font-size: 12px;
+      color: #94a3b8;
+    }
+
+    .speed-btn-group {
+      display: flex;
+      gap: 4px;
+    }
+
+    .speed-btn {
+      padding: 4px 8px;
+      border-radius: 4px;
+      border: none;
+      background: #1e293b;
+      color: #cbd5e1;
+      font-size: 11px;
+      cursor: pointer;
+    }
+
+    .speed-btn.active {
+      background: #059669;
+      color: #ffffff;
+      font-weight: 700;
+    }
+
+    /* Code Box */
+    .code-box {
+      background: #020617;
+      border: 1px solid #0f172a;
+      border-radius: 12px;
+      padding: 12px;
+      font-size: 12px;
+      line-height: 1.6;
+      overflow-x: auto;
+      flex: 1;
+      min-height: 200px;
+    }
+
+    .code-line {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 2px 6px;
+      border-left: 3px solid transparent;
+      border-radius: 0 4px 4px 0;
+    }
+
+    .code-line.active {
+      background: rgba(59, 130, 246, 0.2);
+      border-left-color: #3b82f6;
+    }
+
+    .line-num {
+      color: #475569;
+      width: 20px;
+      text-align: right;
+      user-select: none;
+    }
+
+    /* Visual Diagram Layout */
+    .diagram-arena {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      min-height: 380px;
+      padding: 10px;
+    }
+
+    @media (max-width: 768px) {
+      .diagram-arena {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .state-node {
+      background: rgba(15, 23, 42, 0.9);
+      border: 2px solid #1e293b;
+      border-radius: 14px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+    }
+
+    .node-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .node-title {
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .thread-holder {
+      min-h: 48px;
+      background: rgba(2, 6, 23, 0.6);
+      border: 1px dashed #334155;
+      border-radius: 8px;
+      padding: 6px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+    }
+
+    /* State Glows */
+    .glow-NEW { border-color: #a855f7 !important; box-shadow: 0 0 20px rgba(168, 85, 247, 0.4); }
+    .glow-RUNNABLE { border-color: #22c55e !important; box-shadow: 0 0 20px rgba(34, 197, 94, 0.4); }
+    .glow-BLOCKED { border-color: #ef4444 !important; box-shadow: 0 0 20px rgba(239, 68, 68, 0.4); }
+    .glow-WAITING { border-color: #f97316 !important; box-shadow: 0 0 20px rgba(249, 115, 22, 0.4); }
+    .glow-TIMED_WAITING { border-color: #eab308 !important; box-shadow: 0 0 20px rgba(234, 179, 8, 0.4); }
+    .glow-TERMINATED { border-color: #64748b !important; box-shadow: 0 0 15px rgba(100, 116, 139, 0.3); }
+
+    /* Thread Pills */
+    .thread-pill {
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      animation: pulse 1.5s infinite;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+    }
+
+    .pill-t1 { background: #0891b2; color: #ecfeff; border: 1px solid #22d3ee; }
+    .pill-t2 { background: #7e22ce; color: #faf5ff; border: 1px solid #c084fc; }
+    .pill-t3 { background: #be185d; color: #fff1f2; border: 1px solid #f472b6; }
+
+    .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.85; transform: scale(0.97); }
+    }
+
+    /* Explanation Panel */
+    .explanation-panel {
+      background: rgba(30, 41, 59, 0.7);
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 14px;
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .exp-icon {
+      width: 32px;
+      height: 32px;
+      background: rgba(59, 130, 246, 0.2);
+      color: #60a5fa;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      flex-shrink: 0;
+    }
+
+    .exp-content h4 {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #94a3b8;
+    }
+
+    .exp-content p {
+      font-size: 13px;
+      color: #f1f5f9;
+      margin-top: 4px;
+      line-height: 1.5;
+    }
+
+    /* Timeline Log */
+    .timeline-log {
+      height: 110px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 11px;
+    }
+
+    .log-item {
+      display: flex;
+      gap: 8px;
+      border-left: 2px solid #334155;
+      padding-left: 8px;
+      color: #cbd5e1;
+    }
+
+    .log-time {
+      color: #64748b;
+    }
+
+    /* Table Matrix */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 12px;
+    }
+
+    th {
+      background: #0f172a;
+      padding: 12px;
+      color: #94a3b8;
+      font-weight: 600;
+      border-bottom: 1px solid #1e293b;
+      text-transform: uppercase;
+    }
+
+    td {
+      padding: 12px;
+      border-bottom: 1px solid #1e293b;
+      color: #e2e8f0;
+    }
+
+    tr:hover td {
+      background: rgba(30, 41, 59, 0.4);
+    }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER NAVIGATION -->
+  <header>
+    <div class="header-title-box">
+      <div class="header-icon">&#9881;</div>
+      <div>
+        <h1>Java Thread Life Cycle Visualizer</h1>
+        <div class="header-subtitle">Interactive Architecture Engine: <span class="font-mono text-purple">Thread.State</span> & Monitor Mechanics</div>
+      </div>
+    </div>
+
+    <div class="tab-container">
+      <button id="tab-nav-vis" onclick="switchTab('vis')" class="tab-btn active">Life Cycle Visualizer</button>
+      <button id="tab-nav-ws" onclick="switchTab('ws')" class="tab-btn">Wait vs Sleep (Production)</button>
+      <button id="tab-nav-quiz" onclick="switchTab('quiz')" class="tab-btn">Reference & Quiz</button>
+    </div>
+  </header>
+
+  <!-- MAIN CONTAINER -->
+  <main>
+
+    <!-- TAB 1: VISUALIZER VIEW -->
+    <div id="view-vis" class="grid-12">
+
+      <!-- LEFT SIDEBAR: CONTROLS & CODE -->
+      <div class="col-4 flex flex-col gap-16" style="display:flex; flex-direction:column; gap:16px;">
+        
+        <!-- SCENARIO CARD -->
+        <div class="glass-card">
+          <div class="card-header">
+            <span class="card-title">Select Scenario</span>
+            <span id="scen-badge" class="badge badge-purple">Standard Lifecycle</span>
+          </div>
+
+          <div class="scenario-list">
+            <button onclick="loadScenario('basic')" id="btn-scen-basic" class="scen-btn active">
+              <div>
+                <div class="scen-btn-title">1. Standard Thread Lifecycle</div>
+                <div class="scen-btn-desc">NEW &rarr; RUNNABLE &rarr; TERMINATED</div>
+              </div>
+              <div>&rsaquo;</div>
+            </button>
+
+            <button onclick="loadScenario('sleep')" id="btn-scen-sleep" class="scen-btn">
+              <div>
+                <div class="scen-btn-title">2. Thread.sleep() & Timed Waiting</div>
+                <div class="scen-btn-desc">TIMED_WAITING state timer countdown</div>
+              </div>
+              <div>&rsaquo;</div>
+            </button>
+
+            <button onclick="loadScenario('wait')" id="btn-scen-wait" class="scen-btn">
+              <div>
+                <div class="scen-btn-title">3. Wait / Notify Mechanism</div>
+                <div class="scen-btn-desc">Object.wait() and Wait Set notification</div>
+              </div>
+              <div>&rsaquo;</div>
+            </button>
+
+            <button onclick="loadScenario('blocked')" id="btn-scen-blocked" class="scen-btn">
+              <div>
+                <div class="scen-btn-title">4. Lock Contention (BLOCKED)</div>
+                <div class="scen-btn-desc">Waiting for synchronized monitor lock</div>
+              </div>
+              <div>&rsaquo;</div>
+            </button>
+
+            <button onclick="loadScenario('join')" id="btn-scen-join" class="scen-btn">
+              <div>
+                <div class="scen-btn-title">5. Thread.join() Coordination</div>
+                <div class="scen-btn-desc">Thread-1 waits for Thread-2 completion</div>
+              </div>
+              <div>&rsaquo;</div>
+            </button>
+          </div>
+        </div>
+
+        <!-- CONTROLS CARD -->
+        <div class="glass-card">
+          <div class="card-header">
+            <span class="card-title">Execution Controls</span>
+            <span id="step-counter" class="font-mono" style="font-size: 11px; color: #94a3b8;">Step 0 / 0</span>
+          </div>
+
+          <div class="controls-grid">
+            <button id="btn-prev" onclick="prevStep()" class="ctrl-btn">&laquo;</button>
+            <button id="btn-play" onclick="togglePlay()" class="ctrl-btn ctrl-btn-primary">&#9654;</button>
+            <button id="btn-next" onclick="nextStep()" class="ctrl-btn">&raquo;</button>
+            <button id="btn-reset" onclick="resetSim()" class="ctrl-btn">&#8634;</button>
+          </div>
+
+          <div class="speed-box">
+            <span>Speed:</span>
+            <div class="speed-btn-group">
+              <button onclick="setSpeed(3000, this)" class="speed-btn">0.25x</button>
+              <button onclick="setSpeed(1600, this)" class="speed-btn">0.5x</button>
+              <button onclick="setSpeed(900, this)" class="speed-btn active">1x</button>
+              <button onclick="setSpeed(450, this)" class="speed-btn">2x</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- CODE SNIPPET CARD -->
+        <div class="glass-card" style="flex: 1;">
+          <div class="card-header">
+            <span class="card-title">Java Code Execution</span>
+            <span class="font-mono" style="font-size:10px; color:#64748b;">ThreadDemo.java</span>
+          </div>
+          <div id="code-container" class="code-box font-mono">
+            <!-- Code lines injected dynamically -->
+          </div>
+        </div>
+
+      </div>
+
+      <!-- RIGHT AREA: VISUAL ARENA & LOG -->
+      <div class="col-8 flex flex-col gap-16" style="display:flex; flex-direction:column; gap:16px;">
+        
+        <!-- VISUAL STATE MACHINE CANVAS -->
+        <div class="glass-card" style="min-height: 480px; justify-content: space-between;">
+          
+          <div class="card-header">
+            <span class="card-title">JVM State Machine Diagram</span>
+            <div id="active-threads-bar" style="display:flex; gap:8px;"></div>
+          </div>
+
+          <!-- STATE NODES GRID -->
+          <div class="diagram-arena">
+            
+            <!-- NEW -->
+            <div id="node-NEW" class="state-node">
+              <div class="node-header">
+                <span class="node-title" style="color: #c084fc;">NEW</span>
+                <span style="font-size:9px; color:#64748b;">Instantiated</span>
+              </div>
+              <div id="holder-NEW" class="thread-holder"></div>
+            </div>
+
+            <!-- RUNNABLE -->
+            <div id="node-RUNNABLE" class="state-node" style="grid-column: span 2;">
+              <div class="node-header">
+                <span class="node-title" style="color: #4ade80;">RUNNABLE</span>
+                <span style="font-size:9px; color:#64748b;">OS Scheduler Queue / Physical CPU Core</span>
+              </div>
+              <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
+                <div>
+                  <div style="font-size:10px; color:#94a3b8; margin-bottom:4px;">READY (Scheduler Queue)</div>
+                  <div id="holder-RUNNABLE-READY" class="thread-holder"></div>
+                </div>
+                <div>
+                  <div style="font-size:10px; color:#94a3b8; margin-bottom:4px;">RUNNING (On CPU)</div>
+                  <div id="holder-RUNNABLE-RUNNING" class="thread-holder"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- BLOCKED -->
+            <div id="node-BLOCKED" class="state-node">
+              <div class="node-header">
+                <span class="node-title" style="color: #f87171;">BLOCKED</span>
+                <span style="font-size:9px; color:#64748b;">Monitor Lock Contention</span>
+              </div>
+              <div id="holder-BLOCKED" class="thread-holder"></div>
+            </div>
+
+            <!-- WAITING -->
+            <div id="node-WAITING" class="state-node">
+              <div class="node-header">
+                <span class="node-title" style="color: #fb923c;">WAITING</span>
+                <span style="font-size:9px; color:#64748b;">Indefinite wait() / join()</span>
+              </div>
+              <div id="holder-WAITING" class="thread-holder"></div>
+            </div>
+
+            <!-- TIMED_WAITING -->
+            <div id="node-TIMED_WAITING" class="state-node">
+              <div class="node-header">
+                <span class="node-title" style="color: #facc15;">TIMED_WAITING</span>
+                <span style="font-size:9px; color:#64748b;">sleep(ms) / wait(timeout)</span>
+              </div>
+              <div id="holder-TIMED_WAITING" class="thread-holder"></div>
+            </div>
+
+            <!-- TERMINATED -->
+            <div id="node-TERMINATED" class="state-node" style="grid-column: span 3;">
+              <div class="node-header">
+                <span class="node-title" style="color: #94a3b8;">TERMINATED</span>
+                <span style="font-size:9px; color:#64748b;">Completed / Died</span>
+              </div>
+              <div id="holder-TERMINATED" class="thread-holder"></div>
+            </div>
+
+          </div>
+
+          <!-- STEP EXPLANATION -->
+          <div class="explanation-panel">
+            <div class="exp-icon">&iexcl;</div>
+            <div class="exp-content">
+              <h4 id="exp-step-tag">Step 1</h4>
+              <p id="exp-text">Select a scenario and click Play or Step Forward to visualize thread transitions.</p>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- LOG TIMELINE -->
+        <div class="glass-card">
+          <div class="card-header">
+            <span class="card-title">Execution Event Timeline</span>
+            <button onclick="clearLog()" style="background:none; border:none; color:#64748b; font-size:11px; cursor:pointer;">Clear</button>
+          </div>
+          <div id="timeline-log" class="timeline-log font-mono">
+            <!-- Event entries injected dynamically -->
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- TAB 2: WAIT VS SLEEP COMPARISON & PRODUCTION GUIDE -->
+    <div id="view-ws" class="col-12 hidden flex flex-col gap-16" style="display:flex; flex-direction:column; gap:16px;">
+      
+      <!-- HERO COMPARISON CARD -->
+      <div class="glass-card" style="border-color: rgba(59, 130, 246, 0.3);">
+        <div class="card-header">
+          <span class="card-title" style="color:#60a5fa;">Golden Rule of Java Concurrency</span>
+          <button onclick="runWaitSleepDemo()" class="ctrl-btn ctrl-btn-primary" style="padding: 6px 14px; font-size: 12px;">
+            Run Interactive Lock Demo
+          </button>
+        </div>
+        <p style="font-size:14px; color:#e2e8f0; line-height: 1.6;">
+          <strong>Thread.sleep()</strong> pauses execution while <span style="color:#fbbf24;">RETAINING ALL LOCKS</span>. Other threads remain blocked waiting for the monitor.<br>
+          <strong>Object.wait()</strong> pauses execution while <span style="color:#34d399;">RELEASING MONITOR LOCK</span>, allowing other threads to enter the synchronized block.
+        </p>
+      </div>
+
+      <!-- SIDE BY SIDE INTERACTIVE SIMULATION -->
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">
+        
+        <!-- SLEEP SIMULATION -->
+        <div class="glass-card" style="border-color: rgba(251, 191, 36, 0.3);">
+          <div class="card-header">
+            <span style="font-weight:bold; color:#fbbf24;">Thread.sleep(1000)</span>
+            <span id="ws-sleep-badge" class="badge badge-rose">LOCK HELD (No Release)</span>
+          </div>
+          <p style="font-size:12px; color:#94a3b8;">Thread-A sleeps inside synchronized block. Thread-B attempts to enter and is <strong>BLOCKED</strong>.</p>
+
+          <div style="background:#020617; padding:14px; border-radius:10px; border:1px solid #1e293b; display:flex; flex-direction:column; gap:8px;">
+            <div style="display:flex; justify-content:space-between; font-size:12px;">
+              <span>Monitor Lock Status:</span>
+              <span id="ws-sleep-owner" style="color:#fbbf24; font-weight:bold;">Held by Thread-A</span>
+            </div>
+            <div style="padding:8px; background:rgba(251, 191, 36, 0.1); border:1px solid rgba(251, 191, 36, 0.3); border-radius:6px; font-size:12px; color:#fbbf24;">
+              Thread-A &rarr; TIMED_WAITING (Holding Lock)
+            </div>
+            <div style="padding:8px; background:rgba(244, 63, 94, 0.1); border:1px solid rgba(244, 63, 94, 0.3); border-radius:6px; font-size:12px; color:#f43f5e;">
+              Thread-B &rarr; BLOCKED (Locked Out!)
+            </div>
+          </div>
+        </div>
+
+        <!-- WAIT SIMULATION -->
+        <div class="glass-card" style="border-color: rgba(52, 211, 153, 0.3);">
+          <div class="card-header">
+            <span style="font-weight:bold; color:#34d399;">object.wait(1000)</span>
+            <span id="ws-wait-badge" class="badge badge-emerald">LOCK RELEASED</span>
+          </div>
+          <p style="font-size:12px; color:#94a3b8;">Thread-A calls wait(). Releases monitor lock. Thread-B acquires lock and becomes <strong>RUNNABLE</strong>.</p>
+
+          <div style="background:#020617; padding:14px; border-radius:10px; border:1px solid #1e293b; display:flex; flex-direction:column; gap:8px;">
+            <div style="display:flex; justify-content:space-between; font-size:12px;">
+              <span>Monitor Lock Status:</span>
+              <span id="ws-wait-owner" style="color:#34d399; font-weight:bold;">Released to Thread-B</span>
+            </div>
+            <div style="padding:8px; background:rgba(30, 41, 59, 0.6); border:1px solid #334155; border-radius:6px; font-size:12px; color:#fbbf24;">
+              Thread-A &rarr; WAITING (In Wait Set)
+            </div>
+            <div style="padding:8px; background:rgba(52, 211, 153, 0.1); border:1px solid rgba(52, 211, 153, 0.3); border-radius:6px; font-size:12px; color:#34d399;">
+              Thread-B &rarr; RUNNABLE (Acquired Lock & Executing)
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- COMPARISON MATRIX -->
+      <div class="glass-card">
+        <span class="card-title">Production Comparison Matrix</span>
+        <table>
+          <thead>
+            <tr>
+              <th>Feature / Dimension</th>
+              <th>Thread.sleep()</th>
+              <th>Object.wait()</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Class Origin</strong></td>
+              <td>Static method on <code>java.lang.Thread</code></td>
+              <td>Instance method on <code>java.lang.Object</code></td>
+            </tr>
+            <tr>
+              <td><strong>Lock Holding Behavior</strong></td>
+              <td><span style="color:#f43f5e; font-weight:bold;">Keeps monitor locks</span></td>
+              <td><span style="color:#34d399; font-weight:bold;">Releases monitor lock</span></td>
+            </tr>
+            <tr>
+              <td><strong>Synchronized Context Required?</strong></td>
+              <td>No. Can be called anywhere.</td>
+              <td>Yes. Throws <code>IllegalMonitorStateException</code> if not in synchronized context.</td>
+            </tr>
+            <tr>
+              <td><strong>Production Use Cases</strong></td>
+              <td>Polling, exponential retry backoff, rate-limiting.</td>
+              <td>Producer-Consumer queues, inter-thread notification, guarded wait state conditions.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+
+    <!-- TAB 3: QUIZ & REFERENCE -->
+    <div id="view-quiz" class="col-12 hidden flex flex-col gap-16" style="display:flex; flex-direction:column; gap:16px;">
+      
+      <div class="glass-card">
+        <span class="card-title">Self-Assessment Mini Quiz</span>
+        <div id="quiz-box" style="display:flex; flex-direction:column; gap:16px;">
+          <!-- Quiz items injected by JS -->
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <script>
+    // --- SCENARIO DATA ---
+    const SCENARIOS = {
+      basic: {
+        badge: "Standard Lifecycle",
+        code: [
+          "public class ThreadDemo {",
+          "  public static void main(String[] args) {",
+          "    Thread thread1 = new Thread(() -> {",
+          "      System.out.println(\"Executing on CPU...\");",
+          "    }); // Thread created in NEW state",
+          "",
+          "    thread1.start(); // Moves to RUNNABLE",
+          "  } // Completes run() -> TERMINATED",
+          "}"
+        ],
+        threads: [{ id: 't1', name: 'Thread-1', class: 'pill-t1' }],
+        steps: [
+          { line: 3, pos: { t1: 'NEW' }, exp: "Thread-1 created via 'new Thread()'. State is NEW.", log: "Thread-1 instantiated -> NEW" },
+          { line: 7, pos: { t1: 'RUNNABLE-READY' }, exp: "thread1.start() called! Native OS thread spawned and queued in READY state.", log: "thread1.start() executed -> RUNNABLE (READY)" },
+          { line: 4, pos: { t1: 'RUNNABLE-RUNNING' }, exp: "OS scheduler dispatches Thread-1 onto CPU core.", log: "Thread-1 dispatched to CPU -> RUNNABLE (RUNNING)" },
+          { line: 8, pos: { t1: 'TERMINATED' }, exp: "run() method completed. Thread enters TERMINATED state.", log: "Thread-1 finished -> TERMINATED" }
+        ]
+      },
+      sleep: {
+        badge: "Thread.sleep()",
+        code: [
+          "Thread thread1 = new Thread(() -> {",
+          "  try {",
+          "    // Timed Waiting for 1000ms",
+          "    Thread.sleep(1000);",
+          "  } catch (InterruptedException e) {}",
+          "});",
+          "thread1.start();"
+        ],
+        threads: [{ id: 't1', name: 'Thread-1', class: 'pill-t1' }],
+        steps: [
+          { line: 1, pos: { t1: 'NEW' }, exp: "Thread-1 created in NEW state.", log: "Thread-1 created -> NEW" },
+          { line: 7, pos: { t1: 'RUNNABLE-RUNNING' }, exp: "Thread-1 started and executing on CPU core.", log: "Thread-1 running on CPU -> RUNNABLE" },
+          { line: 4, pos: { t1: 'TIMED_WAITING' }, exp: "Thread.sleep(1000) called. Thread suspended by OS timer.", log: "Thread.sleep(1000) -> TIMED_WAITING" },
+          { line: 5, pos: { t1: 'RUNNABLE-READY' }, exp: "1000ms timer expired! Re-queued into OS READY queue.", log: "Timer expired -> RUNNABLE (READY)" },
+          { line: 6, pos: { t1: 'TERMINATED' }, exp: "Execution finished.", log: "Thread-1 completed -> TERMINATED" }
+        ]
+      },
+      wait: {
+        badge: "Wait / Notify",
+        code: [
+          "synchronized(lock) {",
+          "  // Thread-1 releases lock & waits",
+          "  lock.wait();",
+          "}",
+          "// Thread-2 calls lock.notify();"
+        ],
+        threads: [
+          { id: 't1', name: 'Thread-1 (Waiter)', class: 'pill-t1' },
+          { id: 't2', name: 'Thread-2 (Notifier)', class: 'pill-t2' }
+        ],
+        steps: [
+          { line: 1, pos: { t1: 'RUNNABLE-RUNNING', t2: 'RUNNABLE-READY' }, exp: "Thread-1 holds lock in RUNNABLE state.", log: "Thread-1 holds lock." },
+          { line: 3, pos: { t1: 'WAITING', t2: 'RUNNABLE-RUNNING' }, exp: "Thread-1 calls lock.wait(), releases lock, enters WAITING state.", log: "Thread-1 wait() -> WAITING (Released Lock)" },
+          { line: 5, pos: { t1: 'BLOCKED', t2: 'RUNNABLE-RUNNING' }, exp: "Thread-2 calls lock.notify(). Thread-1 moved to BLOCKED to re-acquire monitor lock.", log: "Thread-2 notify() -> Thread-1 BLOCKED" },
+          { line: 4, pos: { t1: 'RUNNABLE-RUNNING', t2: 'TERMINATED' }, exp: "Thread-2 exits block. Thread-1 re-acquires lock and resumes execution.", log: "Thread-1 acquired lock -> RUNNABLE" }
+        ]
+      },
+      blocked: {
+        badge: "Lock Contention",
+        code: [
+          "synchronized(lock) {",
+          "  // Thread-1 holds lock",
+          "  doWork();",
+          "} // Thread-1 unlocks"
+        ],
+        threads: [
+          { id: 't1', name: 'Thread-1 (Owner)', class: 'pill-t1' },
+          { id: 't2', name: 'Thread-2 (Blocked)', class: 'pill-t2' }
+        ],
+        steps: [
+          { line: 1, pos: { t1: 'RUNNABLE-RUNNING', t2: 'NEW' }, exp: "Thread-1 acquires lock.", log: "Thread-1 acquired lock." },
+          { line: 1, pos: { t1: 'RUNNABLE-RUNNING', t2: 'BLOCKED' }, exp: "Thread-2 attempts synchronized(lock) but fails CAS. Thread-2 enters BLOCKED.", log: "Thread-2 lock busy -> BLOCKED" },
+          { line: 4, pos: { t1: 'TERMINATED', t2: 'RUNNABLE-RUNNING' }, exp: "Thread-1 unlocks. Thread-2 unparked and acquires lock.", log: "Thread-1 unlocked -> Thread-2 acquired lock -> RUNNABLE" }
+        ]
+      },
+      join: {
+        badge: "Thread.join()",
+        code: [
+          "t2.start();",
+          "t2.join(); // Thread-1 waits for t2 completion",
+          "System.out.println(\"t2 done!\");"
+        ],
+        threads: [
+          { id: 't1', name: 'Thread-1 (Main)', class: 'pill-t1' },
+          { id: 't2', name: 'Thread-2 (Worker)', class: 'pill-t2' }
+        ],
+        steps: [
+          { line: 1, pos: { t1: 'RUNNABLE-RUNNING', t2: 'RUNNABLE-READY' }, exp: "Thread-1 starts Thread-2.", log: "t2 started." },
+          { line: 2, pos: { t1: 'WAITING', t2: 'RUNNABLE-RUNNING' }, exp: "Thread-1 calls t2.join() and enters WAITING state.", log: "t2.join() -> Thread-1 WAITING" },
+          { line: 2, pos: { t1: 'WAITING', t2: 'TERMINATED' }, exp: "Thread-2 completes execution.", log: "Thread-2 finished." },
+          { line: 3, pos: { t1: 'RUNNABLE-RUNNING', t2: 'TERMINATED' }, exp: "Thread-1 wakes up from join() and resumes.", log: "Thread-1 awakened -> RUNNABLE" }
+        ]
+      }
+    };
+
+    // --- STATE ---
+    let currentScenKey = 'basic';
+    let currentStepIdx = 0;
+    let isPlaying = false;
+    let playTimer = null;
+    let playSpeed = 900;
+
+    window.onload = function() {
+      loadScenario('basic');
+      renderQuiz();
+    };
+
+    function switchTab(tab) {
+      document.getElementById('view-vis').classList.add('hidden');
+      document.getElementById('view-ws').classList.add('hidden');
+      document.getElementById('view-quiz').classList.add('hidden');
+
+      document.getElementById('tab-nav-vis').classList.remove('active');
+      document.getElementById('tab-nav-ws').classList.remove('active');
+      document.getElementById('tab-nav-quiz').classList.remove('active');
+
+      document.getElementById(`view-${tab}`).classList.remove('hidden');
+      document.getElementById(`tab-nav-${tab}`).classList.add('active');
+
+      if (tab !== 'vis') pauseSim();
+    }
+
+    function loadScenario(key) {
+      pauseSim();
+      currentScenKey = key;
+      currentStepIdx = 0;
+
+      const sc = SCENARIOS[key];
+      document.querySelectorAll('.scen-btn').forEach(b => b.classList.remove('active'));
+      const btn = document.getElementById(`btn-scen-${key}`);
+      if (btn) btn.classList.add('active');
+
+      document.getElementById('scen-badge').innerText = sc.badge;
+      renderCode(sc.code);
+      renderStep();
+    }
+
+    function renderCode(lines) {
+      const c = document.getElementById('code-container');
+      c.innerHTML = '';
+      lines.forEach((l, idx) => {
+        const div = document.createElement('div');
+        div.id = `code-line-${idx + 1}`;
+        div.className = 'code-line';
+        div.innerHTML = `<span class="line-num">${idx + 1}</span><span>${escapeCode(l)}</span>`;
+        c.appendChild(div);
+      });
+    }
+
+    function escapeCode(text) {
+      return text
+        .replace(/Thread|Object|System/g, '<span style="color:#c084fc;">$&</span>')
+        .replace(/start|sleep|wait|notify|join|synchronized/g, '<span style="color:#34d399;">$&</span>');
+    }
+
+    function renderStep() {
+      const sc = SCENARIOS[currentScenKey];
+      const step = sc.steps[currentStepIdx];
+
+      document.getElementById('step-counter').innerText = `Step ${currentStepIdx + 1} / ${sc.steps.length}`;
+      document.getElementById('btn-prev').disabled = (currentStepIdx === 0);
+      document.getElementById('btn-next').disabled = (currentStepIdx === sc.steps.length - 1);
+
+      document.querySelectorAll('.code-line').forEach(el => el.classList.remove('active'));
+      if (step.line) {
+        const el = document.getElementById(`code-line-${step.line}`);
+        if (el) el.classList.add('active');
+      }
+
+      ['NEW', 'RUNNABLE-READY', 'RUNNABLE-RUNNING', 'BLOCKED', 'WAITING', 'TIMED_WAITING', 'TERMINATED'].forEach(p => {
+        const h = document.getElementById(`holder-${p}`);
+        if (h) h.innerHTML = '';
+      });
+
+      document.querySelectorAll('.state-node').forEach(n => {
+        n.className = 'state-node';
+      });
+
+      Object.keys(step.pos).forEach(tId => {
+        const p = step.pos[tId];
+        const tObj = sc.threads.find(t => t.id === tId);
+        if (tObj) {
+          const pill = document.createElement('div');
+          pill.className = `thread-pill ${tObj.class}`;
+          pill.innerHTML = `<span class="dot"></span>${tObj.name}`;
+          const h = document.getElementById(`holder-${p}`);
+          if (h) h.appendChild(pill);
+
+          let nKey = p.startsWith('RUNNABLE') ? 'RUNNABLE' : p;
+          const node = document.getElementById(`node-${nKey}`);
+          if (node) node.classList.add(`glow-${nKey}`);
+        }
+      });
+
+      document.getElementById('exp-step-tag').innerText = `Step ${currentStepIdx + 1}`;
+      document.getElementById('exp-text').innerText = step.exp;
+
+      if (step.log) addLog(step.log);
+    }
+
+    function addLog(msg) {
+      const log = document.getElementById('timeline-log');
+      const time = new Date().toLocaleTimeString().split(' ')[0];
+      const div = document.createElement('div');
+      div.className = 'log-item';
+      div.innerHTML = `<span class="log-time">[${time}]</span><span>${msg}</span>`;
+      log.appendChild(div);
+      log.scrollTop = log.scrollHeight;
+    }
+
+    function clearLog() {
+      document.getElementById('timeline-log').innerHTML = '';
+    }
+
+    function togglePlay() {
+      if (isPlaying) pauseSim();
+      else startSim();
+    }
+
+    function startSim() {
+      const sc = SCENARIOS[currentScenKey];
+      if (currentStepIdx >= sc.steps.length - 1) currentStepIdx = 0;
+      isPlaying = true;
+      document.getElementById('btn-play').innerHTML = '&#10074;&#10074;';
+      document.getElementById('btn-play').className = 'ctrl-btn ctrl-btn-pause';
+
+      playTimer = setInterval(() => {
+        if (currentStepIdx < sc.steps.length - 1) {
+          currentStepIdx++;
+          renderStep();
+        } else {
+          pauseSim();
+        }
+      }, playSpeed);
+    }
+
+    function pauseSim() {
+      isPlaying = false;
+      if (playTimer) clearInterval(playTimer);
+      document.getElementById('btn-play').innerHTML = '&#9654;';
+      document.getElementById('btn-play').className = 'ctrl-btn ctrl-btn-primary';
+    }
+
+    function nextStep() {
+      pauseSim();
+      const sc = SCENARIOS[currentScenKey];
+      if (currentStepIdx < sc.steps.length - 1) {
+        currentStepIdx++;
+        renderStep();
+      }
+    }
+
+    function prevStep() {
+      pauseSim();
+      if (currentStepIdx > 0) {
+        currentStepIdx--;
+        renderStep();
+      }
+    }
+
+    function resetSim() {
+      pauseSim();
+      currentStepIdx = 0;
+      renderStep();
+    }
+
+    function setSpeed(ms, btn) {
+      playSpeed = ms;
+      document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      if (isPlaying) {
+        pauseSim();
+        startSim();
+      }
+    }
+
+    function runWaitSleepDemo() {
+      const badgeS = document.getElementById('ws-sleep-badge');
+      const badgeW = document.getElementById('ws-wait-badge');
+      badgeS.style.transform = 'scale(1.1)';
+      badgeW.style.transform = 'scale(1.1)';
+      setTimeout(() => {
+        badgeS.style.transform = 'scale(1)';
+        badgeW.style.transform = 'scale(1)';
+      }, 500);
+    }
+
+    function renderQuiz() {
+      const qBox = document.getElementById('quiz-box');
+      qBox.innerHTML = `
+        <div style="background:#020617; padding:16px; border-radius:12px; border:1px solid #1e293b;">
+          <h4 style="font-size:14px; margin-bottom:10px;">1. Which state does a thread enter when waiting for a synchronized lock?</h4>
+          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
+            <button onclick="checkQ(this, false)" class="scen-btn">WAITING</button>
+            <button onclick="checkQ(this, true)" class="scen-btn">BLOCKED</button>
+          </div>
+        </div>
+      `;
+    }
+
+    function checkQ(btn, correct) {
+      if (correct) {
+        btn.style.borderColor = '#34d399';
+        btn.style.background = 'rgba(52, 211, 153, 0.2)';
+      } else {
+        btn.style.borderColor = '#f43f5e';
+        btn.style.background = 'rgba(244, 63, 94, 0.2)';
+      }
+    }
+  </script>
+</body>
+</html>
