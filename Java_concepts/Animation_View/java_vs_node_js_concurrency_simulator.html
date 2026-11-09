@@ -1,0 +1,1500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Java vs Node.js Concurrency & Thread Execution Simulator</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700;800&display=swap');
+    
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #0b0f19;
+      color: #f1f5f9;
+    }
+    
+    code, pre, .font-mono {
+      font-family: 'Fira Code', monospace;
+    }
+    
+    /* Custom scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #475569;
+    }
+
+    /* Glow & pulse effects */
+    .glow-active {
+      box-shadow: 0 0 15px rgba(59, 130, 246, 0.4);
+    }
+    .glow-alert {
+      box-shadow: 0 0 15px rgba(239, 68, 68, 0.5);
+    }
+    .glow-success {
+      box-shadow: 0 0 15px rgba(34, 197, 94, 0.4);
+    }
+
+    @keyframes pulse-subtle {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+    .animate-pulse-subtle {
+      animation: pulse-subtle 1.5s infinite ease-in-out;
+    }
+
+    /* Thread lane badges */
+    .state-new { background-color: #334155; color: #cbd5e1; }
+    .state-runnable { background-color: #166534; color: #4ade80; border: 1px solid #22c55e; }
+    .state-running { background-color: #15803d; color: #86efac; border: 1px solid #4ade80; }
+    .state-blocked { background-color: #991b1b; color: #fca5a5; border: 1px solid #ef4444; }
+    .state-waiting { background-color: #854d0e; color: #fde047; border: 1px solid #eab308; }
+    .state-terminated { background-color: #1e293b; color: #64748b; }
+
+    /* Timeline grid background */
+    .timeline-grid {
+      background-size: 20px 100%;
+      background-image: linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col bg-slate-950 text-slate-100 overflow-x-hidden">
+
+  <!-- TOP NAVIGATION / HEADER -->
+  <header class="bg-slate-900 border-b border-slate-800 px-4 py-3 sticky top-0 z-50 flex flex-wrap items-center justify-between gap-4 shadow-lg">
+    <div class="flex items-center space-x-3">
+      <div class="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 text-white font-bold text-xl shadow-md">
+        <i class="fa-solid fa-microchip"></i>
+      </div>
+      <div>
+        <h1 class="text-lg font-bold bg-gradient-to-r from-blue-400 via-indigo-300 to-emerald-400 bg-clip-text text-transparent">
+          Java vs Node.js Concurrency Simulator
+        </h1>
+        <p class="text-xs text-slate-400">Thread Execution, Event Loop, Race Conditions & Parallelism</p>
+      </div>
+    </div>
+
+    <!-- SIMULATION SELECTOR -->
+    <div class="flex items-center gap-2">
+      <label for="simSelect" class="text-xs font-semibold text-slate-400 uppercase tracking-wider hidden sm:inline">Scenario:</label>
+      <select id="simSelect" class="bg-slate-800 border border-slate-700 text-slate-200 text-sm rounded-lg px-3 py-2 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 max-w-xs md:max-w-md">
+        <option value="sim1">1. Java Multithreading & Race Condition (Lost Update)</option>
+        <option value="sim2">2. Java Race Condition Prevention (Synchronized & Locks)</option>
+        <option value="sim3">3. Node.js Single-Threaded Event Loop (Microtasks vs Timers)</option>
+        <option value="sim4">4. Node.js libuv Thread Pool & I/O Offloading</option>
+        <option value="sim5">5. Node.js Asynchronous Race Condition (Async Interleaving)</option>
+        <option value="sim6">6. Node.js Race Condition Prevention (Mutex & DB Transactions)</option>
+        <option value="sim7">7. Java vs Node.js Side-by-Side Unified Workload Execution</option>
+        <option value="sim8">8. Node.js Worker Threads vs Java Thread Pool (CPU Heavy Task)</option>
+      </select>
+    </div>
+
+    <!-- MAIN CONTROL BUTTONS & SPEED -->
+    <div class="flex items-center space-x-2">
+      <div class="bg-slate-800 p-1 rounded-lg border border-slate-700 flex items-center space-x-1">
+        <button id="btnPrev" class="px-2.5 py-1.5 rounded text-xs font-semibold bg-slate-700 hover:bg-slate-600 text-slate-200 transition" title="Step Backward">
+          <i class="fa-solid fa-backward-step"></i>
+        </button>
+        <button id="btnPlayPause" class="px-3 py-1.5 rounded text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white transition flex items-center gap-1">
+          <i class="fa-solid fa-play" id="playIcon"></i> <span id="playText">Play</span>
+        </button>
+        <button id="btnNext" class="px-2.5 py-1.5 rounded text-xs font-semibold bg-slate-700 hover:bg-slate-600 text-slate-200 transition" title="Step Forward">
+          <i class="fa-solid fa-forward-step"></i>
+        </button>
+        <button id="btnReset" class="px-2.5 py-1.5 rounded text-xs font-semibold bg-rose-950/60 hover:bg-rose-900 text-rose-300 border border-rose-800/40 transition" title="Reset Simulation">
+          <i class="fa-solid fa-rotate-left"></i>
+        </button>
+      </div>
+
+      <!-- SPEED CONTROLLER -->
+      <div class="flex items-center bg-slate-800 px-2 py-1.5 rounded-lg border border-slate-700 text-xs">
+        <span class="text-slate-400 mr-2 font-medium">Speed:</span>
+        <select id="speedSelect" class="bg-slate-900 text-slate-200 rounded px-2 py-1 font-mono focus:outline-none">
+          <option value="0.25">0.25x</option>
+          <option value="0.5" selected>0.50x</option>
+          <option value="0.75">0.75x</option>
+          <option value="1">1.00x</option>
+          <option value="2">2.00x</option>
+        </select>
+      </div>
+    </div>
+  </header>
+
+  <!-- PROGRESS BAR & STATUS STRIP -->
+  <div class="bg-slate-900/90 border-b border-slate-800/80 px-4 py-2 flex flex-wrap items-center justify-between text-xs gap-3">
+    <div class="flex items-center space-x-3 w-full md:w-auto flex-1">
+      <span class="font-bold text-indigo-400 uppercase tracking-wider text-[11px] whitespace-nowrap" id="simTitleLabel">
+        Sim 1: Java Race Condition
+      </span>
+      <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden border border-slate-700 flex-1 relative cursor-pointer" id="progressBarContainer">
+        <div id="progressBar" class="bg-gradient-to-r from-blue-500 via-indigo-500 to-emerald-400 h-full w-0 transition-all duration-300"></div>
+      </div>
+      <span class="font-mono text-slate-300 whitespace-nowrap min-w-[70px] text-right" id="stepCounter">Step 0 / 0</span>
+    </div>
+    
+    <div class="flex items-center space-x-4 text-slate-400">
+      <div class="flex items-center space-x-1.5">
+        <span class="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
+        <span class="font-mono text-slate-300" id="statusMessage">Ready to run simulation</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN CONTENT GRID -->
+  <main class="flex-1 p-4 grid grid-cols-1 lg:grid-cols-12 gap-4 max-w-[1920px] mx-auto w-full">
+
+    <!-- LEFT COLUMN: ARCHITECTURE RUNTIMES VISUALIZER (8 COLS) -->
+    <section class="lg:col-span-8 flex flex-col space-y-4">
+      
+      <!-- RUNTIMES CONTAINER (SIDE-BY-SIDE OR FOCUSED) -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        
+        <!-- JAVA ARCHITECTURE CARD -->
+        <div id="javaRuntimeCard" class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col space-y-3 relative overflow-hidden transition-all duration-300">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-2.5">
+            <div class="flex items-center space-x-2">
+              <i class="fa-brands fa-java text-orange-500 text-xl"></i>
+              <h2 class="font-bold text-slate-100 text-sm tracking-wide">Java Virtual Machine (JVM)</h2>
+            </div>
+            <span class="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-orange-950/80 text-orange-400 border border-orange-800/50">Multi-Threaded / Parallel</span>
+          </div>
+
+          <!-- JVM THREAD POOL & CPU EXECUTION -->
+          <div class="bg-slate-950/60 p-3 rounded-lg border border-slate-800/80 space-y-2">
+            <div class="text-[11px] font-semibold text-slate-400 flex justify-between items-center">
+              <span><i class="fa-solid fa-microchip text-indigo-400 mr-1"></i> CPU Cores & Thread Scheduler</span>
+              <span id="javaCpuUsage" class="text-[10px] font-mono text-slate-500">Core 0: Idle | Core 1: Idle</span>
+            </div>
+            <div class="grid grid-cols-2 gap-2" id="javaCpuCores">
+              <div class="bg-slate-900 border border-slate-800 p-2 rounded text-center" id="javaCore0">
+                <div class="text-[10px] text-slate-400 font-mono">CPU Core 0</div>
+                <div class="text-xs font-bold font-mono text-slate-500 mt-1 core-task">IDLE</div>
+              </div>
+              <div class="bg-slate-900 border border-slate-800 p-2 rounded text-center" id="javaCore1">
+                <div class="text-[10px] text-slate-400 font-mono">CPU Core 1</div>
+                <div class="text-xs font-bold font-mono text-slate-500 mt-1 core-task">IDLE</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- THREAD LANES & STATES -->
+          <div class="space-y-2">
+            <div class="text-[11px] font-semibold text-slate-400 flex justify-between items-center">
+              <span><i class="fa-solid fa-bars-staggered text-blue-400 mr-1"></i> Java Threads (Thread Pool)</span>
+            </div>
+
+            <!-- MAIN THREAD -->
+            <div class="bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/80 flex items-center justify-between text-xs" id="javaThreadMain">
+              <div class="flex items-center space-x-2">
+                <span class="font-mono font-bold text-slate-300 text-[11px]">main-thread</span>
+              </div>
+              <div class="flex items-center space-x-2">
+                <span class="px-2 py-0.5 rounded text-[10px] font-mono state-badge state-runnable">RUNNABLE</span>
+                <span class="text-[10px] font-mono text-slate-400 thread-action">Executing main()</span>
+              </div>
+            </div>
+
+            <!-- WORKER THREAD 1 -->
+            <div class="bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/80 flex items-center justify-between text-xs" id="javaThreadT1">
+              <div class="flex items-center space-x-2">
+                <span class="font-mono font-bold text-blue-400 text-[11px]">Thread-1</span>
+              </div>
+              <div class="flex items-center space-x-2">
+                <span class="px-2 py-0.5 rounded text-[10px] font-mono state-badge state-new">NEW</span>
+                <span class="text-[10px] font-mono text-slate-400 thread-action">Unstarted</span>
+              </div>
+            </div>
+
+            <!-- WORKER THREAD 2 -->
+            <div class="bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/80 flex items-center justify-between text-xs" id="javaThreadT2">
+              <div class="flex items-center space-x-2">
+                <span class="font-mono font-bold text-emerald-400 text-[11px]">Thread-2</span>
+              </div>
+              <div class="flex items-center space-x-2">
+                <span class="px-2 py-0.5 rounded text-[10px] font-mono state-badge state-new">NEW</span>
+                <span class="text-[10px] font-mono text-slate-400 thread-action">Unstarted</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- SHARED HEAP MEMORY & LOCK MONITOR -->
+          <div class="bg-slate-950/60 p-3 rounded-lg border border-slate-800/80 space-y-2">
+            <div class="flex justify-between items-center text-[11px] font-semibold text-slate-400">
+              <span><i class="fa-solid fa-database text-purple-400 mr-1"></i> Shared Heap & Monitor Lock</span>
+              <span id="javaLockStatus" class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400">LOCK: UNLOCKED</span>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 text-xs">
+              <div class="bg-slate-900 p-2 rounded border border-slate-800 flex flex-col justify-between">
+                <span class="text-[10px] text-slate-400">Shared Balance:</span>
+                <span class="font-mono font-bold text-lg text-emerald-400" id="javaBalanceVal">1000</span>
+              </div>
+              <div class="bg-slate-900 p-2 rounded border border-slate-800 flex flex-col justify-between">
+                <span class="text-[10px] text-slate-400">Monitor State:</span>
+                <span class="font-mono text-xs font-semibold text-slate-300" id="javaMonitorOwner">Owner: None</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- NODE.JS ARCHITECTURE CARD -->
+        <div id="nodeRuntimeCard" class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col space-y-3 relative overflow-hidden transition-all duration-300">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-2.5">
+            <div class="flex items-center space-x-2">
+              <i class="fa-brands fa-node-js text-emerald-500 text-xl"></i>
+              <h2 class="font-bold text-slate-100 text-sm tracking-wide">Node.js Runtime (V8 + libuv)</h2>
+            </div>
+            <span class="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/50">Single-Threaded Loop + Pool</span>
+          </div>
+
+          <!-- V8 MAIN THREAD & CALL STACK -->
+          <div class="bg-slate-950/60 p-3 rounded-lg border border-slate-800/80 space-y-2">
+            <div class="text-[11px] font-semibold text-slate-400 flex justify-between items-center">
+              <span><i class="fa-solid fa-layer-group text-cyan-400 mr-1"></i> V8 Main Thread Call Stack</span>
+              <span id="nodeStackStatus" class="text-[10px] font-mono text-slate-400">Stack: Empty</span>
+            </div>
+            <div class="bg-slate-900 p-2 rounded border border-slate-800 min-h-[50px] flex flex-col justify-end text-xs font-mono space-y-1" id="nodeCallStack">
+              <div class="text-slate-500 italic text-[11px] text-center py-1">[ Main Call Stack Empty ]</div>
+            </div>
+          </div>
+
+          <!-- EVENT LOOP & QUEUES VISUALIZER -->
+          <div class="grid grid-cols-2 gap-2">
+            
+            <!-- MICROTASK QUEUE -->
+            <div class="bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/80 flex flex-col space-y-1.5">
+              <div class="text-[10px] font-bold text-amber-400 flex items-center justify-between">
+                <span>Microtask Queue</span>
+                <span id="microtaskCount" class="font-mono text-slate-400">(0)</span>
+              </div>
+              <div class="bg-slate-900 p-1.5 rounded border border-slate-800 min-h-[42px] font-mono text-[11px] flex flex-col gap-1" id="nodeMicrotasks">
+                <div class="text-slate-600 text-[10px] text-center italic">Empty</div>
+              </div>
+            </div>
+
+            <!-- CALLBACK QUEUE / TIMERS -->
+            <div class="bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/80 flex flex-col space-y-1.5">
+              <div class="text-[10px] font-bold text-blue-400 flex items-center justify-between">
+                <span>Callback Queue</span>
+                <span id="callbackCount" class="font-mono text-slate-400">(0)</span>
+              </div>
+              <div class="bg-slate-900 p-1.5 rounded border border-slate-800 min-h-[42px] font-mono text-[11px] flex flex-col gap-1" id="nodeCallbackQueue">
+                <div class="text-slate-600 text-[10px] text-center italic">Empty</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- LIBUV THREAD POOL & ASYNC I/O -->
+          <div class="bg-slate-950/60 p-3 rounded-lg border border-slate-800/80 space-y-2">
+            <div class="flex justify-between items-center text-[11px] font-semibold text-slate-400">
+              <span><i class="fa-solid fa-gears text-indigo-400 mr-1"></i> libuv Async Engine / Thread Pool</span>
+              <span class="text-[10px] font-mono text-slate-400">UV_THREADPOOL_SIZE: 4</span>
+            </div>
+
+            <!-- LIBUV WORKER THREAD GRID -->
+            <div class="grid grid-cols-4 gap-1.5 text-center font-mono text-[10px]" id="libuvThreadPool">
+              <div class="bg-slate-900 p-1.5 rounded border border-slate-800 text-slate-500" id="libuvWorker0">UV-1: IDLE</div>
+              <div class="bg-slate-900 p-1.5 rounded border border-slate-800 text-slate-500" id="libuvWorker1">UV-2: IDLE</div>
+              <div class="bg-slate-900 p-1.5 rounded border border-slate-800 text-slate-500" id="libuvWorker2">UV-3: IDLE</div>
+              <div class="bg-slate-900 p-1.5 rounded border border-slate-800 text-slate-500" id="libuvWorker3">UV-4: IDLE</div>
+            </div>
+
+            <!-- SHARED STATE / HEAP IN NODE -->
+            <div class="bg-slate-900 p-2 rounded border border-slate-800 flex justify-between items-center text-xs">
+              <span class="text-[10px] text-slate-400">Process Memory / Balance:</span>
+              <span class="font-mono font-bold text-emerald-400 text-sm" id="nodeBalanceVal">1000</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- INTERACTIVE EXECUTION TIMELINE & CPU CORE ALLOCATION -->
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col space-y-3">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+          <div class="flex items-center space-x-2">
+            <i class="fa-solid fa-chart-gantt text-indigo-400"></i>
+            <h3 class="font-bold text-xs tracking-wider uppercase text-slate-300">Horizontal Execution Timeline & State Transitions</h3>
+          </div>
+          <div class="flex items-center space-x-3 text-[10px] font-mono">
+            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded bg-emerald-500 inline-block"></span> Running</span>
+            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded bg-yellow-500 inline-block"></span> Waiting</span>
+            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded bg-red-500 inline-block"></span> Blocked</span>
+            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded bg-blue-500 inline-block"></span> Async I/O</span>
+          </div>
+        </div>
+
+        <div class="space-y-2 overflow-x-auto py-1" id="timelineContainer">
+          <!-- Dynamically populated execution tracks for threads/tasks -->
+          <div class="text-slate-500 text-xs italic text-center py-4">Timeline will generate upon simulation play...</div>
+        </div>
+      </div>
+
+      <!-- DYNAMIC ARCHITECTURE DICTIONARY / CONCURRENCY CONCEPTS -->
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col space-y-2">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+          <div class="flex items-center space-x-2 text-amber-400">
+            <i class="fa-solid fa-book-bookmark"></i>
+            <h3 class="font-bold text-xs tracking-wider uppercase text-slate-200">Active Concept & Runtime Architecture Inspector</h3>
+          </div>
+          <span class="text-[10px] font-mono text-slate-500" id="dictCategory">Architectural Context</span>
+        </div>
+        <div id="dictContent" class="space-y-1">
+          <h4 class="text-sm font-bold text-indigo-300" id="dictTitle">Ready to Explain Execution Concepts</h4>
+          <p class="text-xs text-slate-300 leading-relaxed" id="dictDesc">
+            Select and run any simulation scenario to inspect active concurrency patterns, V8 event loop mechanics, JVM thread scheduler state transitions, and memory synchronization rules in real time.
+          </p>
+          <div class="mt-2 text-[11px] bg-slate-950 p-2.5 rounded border border-slate-800 font-mono text-slate-400 hidden" id="dictExample">
+            <!-- Dynamic code/real-world context -->
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- RIGHT COLUMN: CODE VIEWER, LOGS & COMPARISON (4 COLS) -->
+    <section class="lg:col-span-4 flex flex-col space-y-4">
+      
+      <!-- CODE VIEWER & EXPECTED VS ACTUAL OUTPUT -->
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col space-y-3">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+          <div class="flex items-center space-x-2">
+            <i class="fa-solid fa-code text-cyan-400"></i>
+            <h3 class="font-bold text-xs tracking-wider uppercase text-slate-300">Executing Source Code</h3>
+          </div>
+          <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400" id="codeLangBadge">JAVA / JS</span>
+        </div>
+
+        <!-- CODE BLOCK WITH LINE HIGHLIGHT -->
+        <div class="bg-slate-950 p-3 rounded-lg border border-slate-800/90 font-mono text-xs overflow-x-auto max-h-[260px] relative" id="codeContainer">
+          <pre id="codeBlock" class="text-slate-300 leading-relaxed">
+<!-- Code will be inserted dynamically -->
+          </pre>
+        </div>
+
+        <!-- EXPECTED VS ACTUAL OUTPUT BOX -->
+        <div class="grid grid-cols-2 gap-2 text-xs font-mono">
+          <div class="bg-slate-950/80 p-2.5 rounded border border-slate-800">
+            <span class="text-[10px] text-slate-500 uppercase block font-sans font-bold">Expected Output:</span>
+            <span class="text-emerald-400 font-bold text-sm block mt-0.5" id="expectedVal">Balance = 1200</span>
+          </div>
+          <div class="bg-slate-950/80 p-2.5 rounded border border-slate-800">
+            <span class="text-[10px] text-slate-500 uppercase block font-sans font-bold">Actual Simulated:</span>
+            <span class="text-slate-300 font-bold text-sm block mt-0.5" id="actualVal">In Progress...</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- EXECUTION LOG PANEL -->
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col space-y-2 flex-1 min-h-[220px]">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+          <div class="flex items-center space-x-2">
+            <i class="fa-solid fa-terminal text-emerald-400"></i>
+            <h3 class="font-bold text-xs tracking-wider uppercase text-slate-300">Live Execution Step Log</h3>
+          </div>
+          <button id="btnClearLog" class="text-[10px] text-slate-500 hover:text-slate-300 transition font-mono">Clear</button>
+        </div>
+
+        <div id="executionLog" class="bg-slate-950 p-2.5 rounded-lg border border-slate-800 flex-1 overflow-y-auto font-mono text-[11px] space-y-1.5 max-h-[280px]">
+          <div class="text-slate-600 italic">[ Simulation log initialized ]</div>
+        </div>
+      </div>
+
+    </section>
+  </main>
+
+  <!-- COMPARISON TABLE SECTION (JAVA VS NODE.JS) -->
+  <section class="max-w-[1920px] mx-auto w-full p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
+        <div>
+          <h2 class="text-base font-bold text-slate-100 flex items-center gap-2">
+            <i class="fa-solid fa-scale-balanced text-indigo-400"></i>
+            Architectural Comparison: Java Virtual Machine vs Node.js Event-Driven Engine
+          </h2>
+          <p class="text-xs text-slate-400 mt-0.5">Deep-dive technical matrix into threading, memory allocation, and concurrency safeguards</p>
+        </div>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs border-collapse">
+          <thead>
+            <tr class="bg-slate-950/80 text-slate-300 border-b border-slate-800 font-mono">
+              <th class="p-3">Architectural Dimension</th>
+              <th class="p-3 text-orange-400"><i class="fa-brands fa-java mr-1"></i> Java (JVM)</th>
+              <th class="p-3 text-emerald-400"><i class="fa-brands fa-node-js mr-1"></i> Node.js (V8 + libuv)</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-800/60 text-slate-300">
+            <tr class="hover:bg-slate-800/30">
+              <td class="p-3 font-semibold text-slate-200">Default Execution Model</td>
+              <td class="p-3">Multi-threaded platform threads mapped directly to OS kernel threads (plus Virtual Threads in Java 21+).</td>
+              <td class="p-3">Single-threaded event loop for JS code execution; offloads blocking I/O to libuv thread pool or OS async APIs.</td>
+            </tr>
+            <tr class="hover:bg-slate-800/30">
+              <td class="p-3 font-semibold text-slate-200">Memory Sharing Model</td>
+              <td class="p-3">Shared process heap. All threads access same memory space, requiring synchronization to prevent race conditions.</td>
+              <td class="p-3">Isolated V8 memory heaps. Worker Threads run separate isolates and communicate via message passing or SharedArrayBuffer.</td>
+            </tr>
+            <tr class="hover:bg-slate-800/30">
+              <td class="p-3 font-semibold text-slate-200">CPU-Bound Workload Handling</td>
+              <td class="p-3">Scales naturally across all CPU cores using `ForkJoinPool`, `ExecutorService`, or parallel streams.</td>
+              <td class="p-3">Blocks the main Event Loop if run synchronously. Requires offloading to Worker Threads (`worker_threads`).</td>
+            </tr>
+            <tr class="hover:bg-slate-800/30">
+              <td class="p-3 font-semibold text-slate-200">I/O-Bound Workload Handling</td>
+              <td class="p-3">Historically blocking I/O per thread. Modern Java uses NIO (epoll/kqueue) and lightweight Virtual Threads.</td>
+              <td class="p-3">Highly optimized non-blocking async I/O engine using OS event notifications (epoll, kqueue, IOCP) via libuv.</td>
+            </tr>
+            <tr class="hover:bg-slate-800/30">
+              <td class="p-3 font-semibold text-slate-200">Race Condition Vulnerability</td>
+              <td class="p-3">Occurs via hardware-level concurrent memory reads/writes on multiple threads executing simultaneously.</td>
+              <td class="p-3">Occurs via logical asynchronous interleaving (e.g., across `await` statements) modifying shared mutable state.</td>
+            </tr>
+            <tr class="hover:bg-slate-800/30">
+              <td class="p-3 font-semibold text-slate-200">Synchronization Safeguards</td>
+              <td class="p-3">`synchronized` blocks, `ReentrantLock`, `AtomicInteger`, `ConcurrentHashMap`, `Semaphore`, `ReadWriteLock`.</td>
+              <td class="p-3">Async Mutex libraries, Promise queues, Atomic DB operations (`UPDATE ... SET val = val + 1`), DB transactions.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- JAVASCRIPT SIMULATION ENGINE -->
+  <script>
+    /**
+     * Java vs Node.js Concurrency Simulator Engine
+     * Fully deterministic step-based interactive engine
+     */
+
+    // --- SIMULATION DATASETS & DEFINITIONS ---
+    const SIMULATIONS = {
+      sim1: {
+        id: "sim1",
+        title: "1. Java Multithreading & Race Condition (Lost Update)",
+        lang: "JAVA",
+        expected: "Balance = 1200",
+        code: `public class BankAccount {
+    private int balance = 1000;
+
+    public void deposit(int amount) {
+        int current = balance; // Step 1: Read shared balance
+        current += amount;      // Step 2: Compute updated value
+        balance = current;      // Step 3: Write back to memory
+    }
+}
+// Thread-1 and Thread-2 execute deposit(100) concurrently without locks.`,
+        steps: [
+          {
+            step: 1,
+            desc: "Main thread initializes shared BankAccount object with balance = 1000 in JVM Heap memory.",
+            javaState: { main: "RUNNABLE", t1: "NEW", t2: "NEW", balance: 1000, lock: "UNLOCKED", core0: "main-thread", core1: "IDLE" },
+            nodeState: { callstack: [], microtasks: [], callbacks: [], libuv: ["IDLE","IDLE","IDLE","IDLE"], balance: 1000 },
+            line: 2,
+            dictKey: "JVM_HEAP"
+          },
+          {
+            step: 2,
+            desc: "Main thread spawns Thread-1 and Thread-2, submitting them to the OS Thread Scheduler.",
+            javaState: { main: "RUNNABLE", t1: "RUNNABLE", t2: "RUNNABLE", balance: 1000, lock: "UNLOCKED", core0: "Thread-1", core1: "Thread-2" },
+            nodeState: { callstack: [], microtasks: [], callbacks: [], libuv: ["IDLE","IDLE","IDLE","IDLE"], balance: 1000 },
+            line: 10,
+            dictKey: "THREAD_SCHEDULER"
+          },
+          {
+            step: 3,
+            desc: "PARALLEL EXECUTION: Core 0 executes Thread-1 while Core 1 executes Thread-2 simultaneously.",
+            javaState: { main: "WAITING", t1: "RUNNING", t2: "RUNNING", balance: 1000, lock: "UNLOCKED", core0: "Thread-1 (deposit)", core1: "Thread-2 (deposit)" },
+            nodeState: { callstack: [], microtasks: [], callbacks: [], libuv: ["IDLE","IDLE","IDLE","IDLE"], balance: 1000 },
+            line: 5,
+            dictKey: "PARALLELISM"
+          },
+          {
+            step: 4,
+            desc: "Thread-1 reads shared balance = 1000 into its CPU register.",
+            javaState: { main: "WAITING", t1: "RUNNING (Read: 1000)", t2: "RUNNING", balance: 1000, lock: "UNLOCKED", core0: "Thread-1 [R:1000]", core1: "Thread-2" },
+            nodeState: { callstack: [], microtasks: [], callbacks: [], libuv: ["IDLE","IDLE","IDLE","IDLE"], balance: 1000 },
+            line: 5,
+            dictKey: "SHARED_MEMORY"
+          },
+          {
+            step: 5,
+            desc: "RACE CONDITION: Thread-2 reads shared balance = 1000 BEFORE Thread-1 writes back its update!",
+            javaState: { main: "WAITING", t1: "RUNNING", t2: "RUNNING (Read: 1000)", balance: 1000, lock: "UNLOCKED", core0: "Thread-1 [Calc 1100]", core1: "Thread-2 [R:1000]" },
+            nodeState: { callstack: [], microtasks: [], callbacks: [], libuv: ["IDLE","IDLE","IDLE","IDLE"], balance: 1000 },
+            line: 5,
+            dictKey: "RACE_CONDITION"
+          },
+          {
+            step: 6,
+            desc: "Thread-1 computes local 1000 + 100 = 1100 and writes 1100 back to shared heap balance.",
+            javaState: { main: "WAITING", t1: "RUNNING (Wrote: 1100)", t2: "RUNNING", balance: 1100, lock: "UNLOCKED", core0: "Thread-1 [W:1100]", core1: "Thread-2 [Calc 1100]" },
+            nodeState: { callstack: [], microtasks: [], callbacks: [], libuv: ["IDLE","IDLE","IDLE","IDLE"], balance: 1100 },
+            line: 7,
+            dictKey: "LOST_UPDATE"
+          },
+          {
+            step: 7,
+            desc: "Thread-2 computes local 1000 + 100 = 1100 and overwrites heap balance with 1100!",
+            javaState: { main: "WAITING", t1: "TERMINATED", t2: "RUNNING (Wrote: 1100)", balance: 1100, lock: "UNLOCKED", core0: "IDLE", core1: "Thread-2 [W:1100]" },
+            nodeState: { callstack: [], microtasks: [], callbacks: [], libuv: ["IDLE","IDLE","IDLE","IDLE"], balance: 1100 },
+            line: 7,
+            dictKey: "LOST_UPDATE"
+          },
+          {
+            step: 8,
+            desc: "SIMULATION COMPLETE: Final Balance = 1100. Thread-1's deposit was lost due to un-synchronized memory access!",
+            javaState: { main: "TERMINATED", t1: "TERMINATED", t2: "TERMINATED", balance: 1100, lock: "UNLOCKED", core0: "IDLE", core1: "IDLE" },
+            nodeState: { callstack: [], microtasks: [], callbacks: [], libuv: ["IDLE","IDLE","IDLE","IDLE"], balance: 1100 },
+            line: 8,
+            dictKey: "THREAD_SAFETY"
+          }
+        ]
+      },
+
+      sim2: {
+        id: "sim2",
+        title: "2. Java Race Condition Prevention (Synchronized & Locks)",
+        lang: "JAVA",
+        expected: "Balance = 1200",
+        code: `public class SynchronizedAccount {
+    private int balance = 1000;
+
+    // Monitor lock prevents concurrent execution
+    public synchronized void deposit(int amount) {
+        int current = balance; 
+        current += amount;      
+        balance = current;      
+    }
+}`,
+        steps: [
+          {
+            step: 1,
+            desc: "Thread-1 attempts to call deposit(100) and acquires object Monitor Lock.",
+            javaState: { main: "WAITING", t1: "RUNNING", t2: "NEW", balance: 1000, lock: "LOCKED (Thread-1)", core0: "Thread-1", core1: "IDLE" },
+            nodeState: { callstack: [], microtasks: [], callbacks: [], libuv: ["IDLE","IDLE","IDLE","IDLE"], balance: 1000 },
+            line: 5,
+            dictKey: "MONITOR_LOCK"
+          },
+          {
+            step: 2,
+            desc: "Thread-2 attempts deposit(100) but Monitor Lock is owned by Thread-1. Thread-2 enters BLOCKED state!",
+            javaState: { main: "WAITING", t1: "RUNNING", t2: "BLOCKED", balance: 1000, lock: "LOCKED (Thread-1)", core0: "Thread-1 (Critical Sec)", core1: "Thread-2 (Blocked)" },
+            nodeState: { callstack: [], microtasks: [], callbacks: [], libuv: ["IDLE","IDLE","IDLE","IDLE"], balance: 1000 },
+            line: 5,
+            dictKey: "MUTUAL_EXCLUSION"
+          },
+          {
+            step: 3,
+            desc: "Thread-1 executes critical section: reads 1000, updates to 1100, writes 1100 to heap balance.",
+            javaState: { main: "WAITING", t1: "RUNNING", t2: "BLOCKED", balance: 1100, lock: "LOCKED (Thread-1)", core0: "Thread-1 [W: 1100]", core1: "IDLE" },
+            nodeState: { callstack: [], microtasks: [], callbacks: [], libuv: ["IDLE","IDLE","IDLE","IDLE"], balance: 1100 },
+            line: 7,
+            dictKey: "CRITICAL_SECTION"
+          },
+          {
+            step: 4,
+            desc: "Thread-1 completes method, releases Monitor Lock, and enters TERMINATED state.",
+            javaState: { main: "WAITING", t1: "TERMINATED", t2: "RUNNABLE", balance: 1100, lock: "UNLOCKED", core0: "IDLE", core1: "IDLE" },
+            nodeState: { callstack: [], microtasks: [], callbacks: [], libuv: ["IDLE","IDLE","IDLE","IDLE"], balance: 1100 },
+            line: 8,
+            dictKey: "REENTRANT_LOCK"
+          },
+          {
+            step: 5,
+            desc: "Thread-2 wakes up from BLOCKED state, acquires Monitor Lock, and enters critical section.",
+            javaState: { main: "WAITING", t1: "TERMINATED", t2: "RUNNING", balance: 1100, lock: "LOCKED (Thread-2)", core0: "Thread-2", core1: "IDLE" },
+            nodeState: { callstack: [], microtasks: [], callbacks: [], libuv: ["IDLE","IDLE","IDLE","IDLE"], balance: 1100 },
+            line: 5,
+            dictKey: "MUTUAL_EXCLUSION"
+          },
+          {
+            step: 6,
+            desc: "Thread-2 reads updated balance 1100, computes 1200, writes 1200, and releases lock.",
+            javaState: { main: "TERMINATED", t1: "TERMINATED", t2: "TERMINATED", balance: 1200, lock: "UNLOCKED", core0: "IDLE", core1: "IDLE" },
+            nodeState: { callstack: [], microtasks: [], callbacks: [], libuv: ["IDLE","IDLE","IDLE","IDLE"], balance: 1200 },
+            line: 7,
+            dictKey: "ATOMIC_OPERATION"
+          }
+        ]
+      },
+
+      sim3: {
+        id: "sim3",
+        title: "3. Node.js Single-Threaded Event Loop (Microtasks vs Timers)",
+        lang: "NODE.JS",
+        expected: "Start -> End -> Promise -> Timer",
+        code: `console.log("Start");
+
+setTimeout(() => {
+    console.log("Timer completed");
+}, 0);
+
+Promise.resolve().then(() => {
+    console.log("Promise microtask completed");
+});
+
+console.log("End");`,
+        steps: [
+          {
+            step: 1,
+            desc: "Node.js process initializes. V8 main thread executes top-level script in Call Stack. Prints 'Start'.",
+            javaState: { main: "IDLE", t1: "IDLE", t2: "IDLE", balance: 1000, lock: "UNLOCKED", core0: "IDLE", core1: "IDLE" },
+            nodeState: { callstack: ["main()", "console.log('Start')"], microtasks: [], callbacks: [], libuv: ["IDLE","IDLE","IDLE","IDLE"], balance: 1000 },
+            line: 1,
+            dictKey: "CALL_STACK"
+          },
+          {
+            step: 2,
+            desc: "V8 encounters setTimeout(..., 0). Offloads timer registration to libuv event loop phase.",
+            javaState: { main: "IDLE", t1: "IDLE", t2: "IDLE", balance: 1000, lock: "UNLOCKED", core0: "IDLE", core1: "IDLE" },
+            nodeState: { callstack: ["main()", "setTimeout(...)"], microtasks: [], callbacks: ["Timer Callback (setTimeout)"], libuv: ["Timer Reg","IDLE","IDLE","IDLE"], balance: 1000 },
+            line: 3,
+            dictKey: "EVENT_LOOP"
+          },
+          {
+            step: 3,
+            desc: "V8 encounters Promise.resolve().then(...). Callback is pushed immediately into Microtask Queue!",
+            javaState: { main: "IDLE", t1: "IDLE", t2: "IDLE", balance: 1000, lock: "UNLOCKED", core0: "IDLE", core1: "IDLE" },
+            nodeState: { callstack: ["main()", "Promise.then(...)"], microtasks: ["Promise.then callback"], callbacks: ["Timer Callback (setTimeout)"], libuv: ["IDLE","IDLE","IDLE","IDLE"], balance: 1000 },
+            line: 7,
+            dictKey: "MICROTASK_QUEUE"
+          },
+          {
+            step: 4,
+            desc: "V8 executes console.log('End'). Prints 'End'. Synchronous main script execution completes.",
+            javaState: { main: "IDLE", t1: "IDLE", t2: "IDLE", balance: 1000, lock: "UNLOCKED", core0: "IDLE", core1: "IDLE" },
+            nodeState: { callstack: ["console.log('End')"], microtasks: ["Promise.then callback"], callbacks: ["Timer Callback (setTimeout)"], libuv: ["IDLE","IDLE","IDLE","IDLE"], balance: 1000 },
+            line: 11,
+            dictKey: "CALL_STACK"
+          },
+          {
+            step: 5,
+            desc: "Main Call Stack becomes EMPTY. Event loop MUST drain Microtask Queue before checking Timers!",
+            javaState: { main: "IDLE", t1: "IDLE", t2: "IDLE", balance: 1000, lock: "UNLOCKED", core0: "IDLE", core1: "IDLE" },
+            nodeState: { callstack: ["Promise Callback"], microtasks: [], callbacks: ["Timer Callback (setTimeout)"], libuv: ["IDLE","IDLE","IDLE","IDLE"], balance: 1000 },
+            line: 8,
+            dictKey: "MICROTASK_QUEUE"
+          },
+          {
+            step: 6,
+            desc: "Microtask Queue drained. Event loop moves to Timers phase, pulls setTimeout callback into stack.",
+            javaState: { main: "IDLE", t1: "IDLE", t2: "IDLE", balance: 1000, lock: "UNLOCKED", core0: "IDLE", core1: "IDLE" },
+            nodeState: { callstack: ["Timer Callback"], microtasks: [], callbacks: [], libuv: ["IDLE","IDLE","IDLE","IDLE"], balance: 1000 },
+            line: 4,
+            dictKey: "EVENT_LOOP"
+          }
+        ]
+      },
+
+      sim4: {
+        id: "sim4",
+        title: "4. Node.js libuv Thread Pool & I/O Offloading",
+        lang: "NODE.JS",
+        expected: "All 4 File Reads Processed Concurrently",
+        code: `const fs = require('fs');
+
+fs.readFile('file1.txt', cb1);
+fs.readFile('file2.txt', cb2);
+fs.readFile('file3.txt', cb3);
+fs.readFile('file4.txt', cb4);`,
+        steps: [
+          {
+            step: 1,
+            desc: "Main JS Thread executes 4 fs.readFile requests. Because disk I/O blocks CPU, libuv delegates them.",
+            javaState: { main: "IDLE", t1: "IDLE", t2: "IDLE", balance: 1000, lock: "UNLOCKED", core0: "IDLE", core1: "IDLE" },
+            nodeState: { callstack: ["main() - issuing 4 fs.readFile"], microtasks: [], callbacks: [], libuv: ["IDLE","IDLE","IDLE","IDLE"], balance: 1000 },
+            line: 3,
+            dictKey: "NON_BLOCKING_IO"
+          },
+          {
+            step: 2,
+            desc: "libuv assigns 4 blocking disk read operations to worker threads UV-1, UV-2, UV-3, and UV-4.",
+            javaState: { main: "IDLE", t1: "IDLE", t2: "IDLE", balance: 1000, lock: "UNLOCKED", core0: "IDLE", core1: "IDLE" },
+            nodeState: { callstack: [], microtasks: [], callbacks: [], libuv: ["Read file1.txt","Read file2.txt","Read file3.txt","Read file4.txt"], balance: 1000 },
+            line: 4,
+            dictKey: "LIBUV"
+          },
+          {
+            step: 3,
+            desc: "Main JS Thread remains 100% UNBLOCKED and ready for other events while libuv threads perform disk reads.",
+            javaState: { main: "IDLE", t1: "IDLE", t2: "IDLE", balance: 1000, lock: "UNLOCKED", core0: "IDLE", core1: "IDLE" },
+            nodeState: { callstack: ["[Main Thread Idle / Ready]"], microtasks: [], callbacks: [], libuv: ["Reading...","Reading...","Reading...","Reading..."], balance: 1000 },
+            line: 5,
+            dictKey: "THREAD_POOL"
+          },
+          {
+            step: 4,
+            desc: "libuv worker threads complete file reads and place completion callbacks onto the Event Loop Callback Queue.",
+            javaState: { main: "IDLE", t1: "IDLE", t2: "IDLE", balance: 1000, lock: "UNLOCKED", core0: "IDLE", core1: "IDLE" },
+            nodeState: { callstack: [], microtasks: [], callbacks: ["cb1()", "cb2()", "cb3()", "cb4()"], libuv: ["IDLE","IDLE","IDLE","IDLE"], balance: 1000 },
+            line: 6,
+            dictKey: "CALLBACK_QUEUE"
+          },
+          {
+            step: 5,
+            desc: "Main JS Thread pulls callbacks one by one from Callback Queue and executes them sequentially in call stack.",
+            javaState: { main: "IDLE", t1: "IDLE", t2: "IDLE", balance: 1000, lock: "UNLOCKED", core0: "IDLE", core1: "IDLE" },
+            nodeState: { callstack: ["cb1() -> cb2() -> cb3() -> cb4()"], microtasks: [], callbacks: [], libuv: ["IDLE","IDLE","IDLE","IDLE"], balance: 1000 },
+            line: 6,
+            dictKey: "EVENT_LOOP"
+          }
+        ]
+      },
+
+      sim5: {
+        id: "sim5",
+        title: "5. Node.js Asynchronous Race Condition (Async Interleaving)",
+        lang: "NODE.JS",
+        expected: "Balance = 1200",
+        code: `let balance = 1000;
+
+async function deposit(amount) {
+    const current = balance; // Read shared balance
+    await new Promise(r => setTimeout(r, 50)); // Yield control!
+    balance = current + amount; // Overwrite shared balance
+}
+
+Promise.all([deposit(100), deposit(100)]);`,
+        steps: [
+          {
+            step: 1,
+            desc: "deposit(100) #1 starts on main JS thread. Reads current balance = 1000 into local scope variable.",
+            javaState: { main: "IDLE", t1: "IDLE", t2: "IDLE", balance: 1000, lock: "UNLOCKED", core0: "IDLE", core1: "IDLE" },
+            nodeState: { callstack: ["deposit #1 (current=1000)"], microtasks: [], callbacks: [], libuv: ["IDLE","IDLE","IDLE","IDLE"], balance: 1000 },
+            line: 4,
+            dictKey: "SHARED_MEMORY"
+          },
+          {
+            step: 2,
+            desc: "deposit #1 hits `await setTimeout`. Main thread PAUSES deposit #1 and yields control to the Event Loop!",
+            javaState: { main: "IDLE", t1: "IDLE", t2: "IDLE", balance: 1000, lock: "UNLOCKED", core0: "IDLE", core1: "IDLE" },
+            nodeState: { callstack: [], microtasks: [], callbacks: ["deposit #1 resume timer"], libuv: ["Timer 50ms","IDLE","IDLE","IDLE"], balance: 1000 },
+            line: 5,
+            dictKey: "ASYNC_INTERLEAVING"
+          },
+          {
+            step: 3,
+            desc: "Main thread executes deposit(100) #2. Reads SAME shared balance = 1000 because deposit #1 hasn't updated it yet!",
+            javaState: { main: "IDLE", t1: "IDLE", t2: "IDLE", balance: 1000, lock: "UNLOCKED", core0: "IDLE", core1: "IDLE" },
+            nodeState: { callstack: ["deposit #2 (current=1000)"], microtasks: [], callbacks: ["deposit #1 resume timer"], libuv: ["Timer 50ms","IDLE","IDLE","IDLE"], balance: 1000 },
+            line: 4,
+            dictKey: "RACE_CONDITION"
+          },
+          {
+            step: 4,
+            desc: "deposit #2 also hits `await setTimeout` and yields control back to the Event Loop.",
+            javaState: { main: "IDLE", t1: "IDLE", t2: "IDLE", balance: 1000, lock: "UNLOCKED", core0: "IDLE", core1: "IDLE" },
+            nodeState: { callstack: [], microtasks: [], callbacks: ["deposit #1 resume timer", "deposit #2 resume timer"], libuv: ["Timer 50ms","Timer 50ms","IDLE","IDLE"], balance: 1000 },
+            line: 5,
+            dictKey: "ASYNC_INTERLEAVING"
+          },
+          {
+            step: 5,
+            desc: "Timer for deposit #1 completes. Resumes execution: balance = 1000 + 100. Heap balance updated to 1100.",
+            javaState: { main: "IDLE", t1: "IDLE", t2: "IDLE", balance: 1000, lock: "UNLOCKED", core0: "IDLE", core1: "IDLE" },
+            nodeState: { callstack: ["deposit #1 (write 1100)"], microtasks: [], callbacks: ["deposit #2 resume timer"], libuv: ["IDLE","Timer 50ms","IDLE","IDLE"], balance: 1100 },
+            line: 6,
+            dictKey: "LOST_UPDATE"
+          },
+          {
+            step: 6,
+            desc: "Timer for deposit #2 completes. Resumes execution: balance = 1000 + 100. Overwrites heap balance with 1100!",
+            javaState: { main: "IDLE", t1: "IDLE", t2: "IDLE", balance: 1000, lock: "UNLOCKED", core0: "IDLE", core1: "IDLE" },
+            nodeState: { callstack: ["deposit #2 (write 1100)"], microtasks: [], callbacks: [], libuv: ["IDLE","IDLE","IDLE","IDLE"], balance: 1100 },
+            line: 6,
+            dictKey: "LOST_UPDATE"
+          },
+          {
+            step: 7,
+            desc: "NODE.JS RACE CONDITION DEMONSTRATED! Single-threaded execution does NOT prevent race conditions across async await boundaries!",
+            javaState: { main: "IDLE", t1: "IDLE", t2: "IDLE", balance: 1000, lock: "UNLOCKED", core0: "IDLE", core1: "IDLE" },
+            nodeState: { callstack: [], microtasks: [], callbacks: [], libuv: ["IDLE","IDLE","IDLE","IDLE"], balance: 1100 },
+            line: 9,
+            dictKey: "THREAD_SAFETY"
+          }
+        ]
+      },
+
+      sim6: {
+        id: "sim6",
+        title: "6. Node.js Race Condition Prevention (Mutex & DB Transactions)",
+        lang: "NODE.JS",
+        expected: "Balance = 1200",
+        code: `const { Mutex } = require('async-mutex');
+const mutex = new Mutex();
+
+async function deposit(amount) {
+    const release = await mutex.acquire(); // Acquire Lock
+    try {
+        const current = balance;
+        await new Promise(r => setTimeout(r, 50));
+        balance = current + amount;
+    } finally {
+        release(); // Release Lock
+    }
+}`,
+        steps: [
+          {
+            step: 1,
+            desc: "deposit #1 acquires Async Mutex lock. Starts critical section.",
+            javaState: { main: "IDLE", t1: "IDLE", t2: "IDLE", balance: 1000, lock: "UNLOCKED", core0: "IDLE", core1: "IDLE" },
+            nodeState: { callstack: ["deposit #1 [Acquired Mutex]"], microtasks: [], callbacks: [], libuv: ["IDLE","IDLE","IDLE","IDLE"], balance: 1000 },
+            line: 5,
+            dictKey: "MUTEX"
+          },
+          {
+            step: 2,
+            desc: "deposit #2 attempts to acquire Mutex, but it is LOCKED. deposit #2 is queued in async lock wait list.",
+            javaState: { main: "IDLE", t1: "IDLE", t2: "IDLE", balance: 1000, lock: "UNLOCKED", core0: "IDLE", core1: "IDLE" },
+            nodeState: { callstack: ["deposit #1 (in critical sec)"], microtasks: ["deposit #2 (waiting lock)"], callbacks: [], libuv: ["IDLE","IDLE","IDLE","IDLE"], balance: 1000 },
+            line: 5,
+            dictKey: "MUTUAL_EXCLUSION"
+          },
+          {
+            step: 3,
+            desc: "deposit #1 completes async work, updates balance to 1100, and releases Mutex lock.",
+            javaState: { main: "IDLE", t1: "IDLE", t2: "IDLE", balance: 1000, lock: "UNLOCKED", core0: "IDLE", core1: "IDLE" },
+            nodeState: { callstack: ["deposit #1 [Release Mutex]"], microtasks: ["deposit #2 (waiting lock)"], callbacks: [], libuv: ["IDLE","IDLE","IDLE","IDLE"], balance: 1100 },
+            line: 10,
+            dictKey: "CRITICAL_SECTION"
+          },
+          {
+            step: 4,
+            desc: "Mutex lock granted to deposit #2. deposit #2 reads UPDATED balance = 1100.",
+            javaState: { main: "IDLE", t1: "IDLE", t2: "IDLE", balance: 1000, lock: "UNLOCKED", core0: "IDLE", core1: "IDLE" },
+            nodeState: { callstack: ["deposit #2 [Acquired Mutex, R: 1100]"], microtasks: [], callbacks: [], libuv: ["IDLE","IDLE","IDLE","IDLE"], balance: 1100 },
+            line: 6,
+            dictKey: "MUTEX"
+          },
+          {
+            step: 5,
+            desc: "deposit #2 completes critical section, writes 1200 to balance, and releases Mutex. Correct Result!",
+            javaState: { main: "IDLE", t1: "IDLE", t2: "IDLE", balance: 1000, lock: "UNLOCKED", core0: "IDLE", core1: "IDLE" },
+            nodeState: { callstack: [], microtasks: [], callbacks: [], libuv: ["IDLE","IDLE","IDLE","IDLE"], balance: 1200 },
+            line: 8,
+            dictKey: "ATOMIC_OPERATION"
+          }
+        ]
+      },
+
+      sim7: {
+        id: "sim7",
+        title: "7. Java vs Node.js Side-by-Side Unified Workload Execution",
+        lang: "JAVA vs NODE",
+        expected: "Java Uses Parallel Threads; Node Uses Event Loop",
+        code: `// WORKLOAD: 10 CPU tasks + 10 Async I/O tasks
+// Java: Uses ExecutorService Thread Pool across CPU cores
+// Node.js: Event loop delegates I/O to libuv, handles JS single-threaded`,
+        steps: [
+          {
+            step: 1,
+            desc: "Workload Submitted: Java allocates threads across multiple CPU cores. Node.js enters Event Loop.",
+            javaState: { main: "RUNNABLE", t1: "RUNNING", t2: "RUNNING", balance: 1000, lock: "UNLOCKED", core0: "Java Pool-T1", core1: "Java Pool-T2" },
+            nodeState: { callstack: ["Event Loop active"], microtasks: [], callbacks: [], libuv: ["I/O Task 1","I/O Task 2","I/O Task 3","I/O Task 4"], balance: 1000 },
+            line: 1,
+            dictKey: "PARALLELISM"
+          },
+          {
+            step: 2,
+            desc: "CPU Workload: Java executes CPU calculations in parallel. Node.js executes CPU task on Main JS thread.",
+            javaState: { main: "RUNNABLE", t1: "RUNNING (CPU Task 1)", t2: "RUNNING (CPU Task 2)", balance: 1000, lock: "UNLOCKED", core0: "Java CPU Calc", core1: "Java CPU Calc" },
+            nodeState: { callstack: ["JS Main (CPU Calc)"], microtasks: [], callbacks: [], libuv: ["I/O Pending...","I/O Pending...","I/O Pending...","I/O Pending..."], balance: 1000 },
+            line: 2,
+            dictKey: "CONTEXT_SWITCHING"
+          },
+          {
+            step: 3,
+            desc: "I/O Offloading: Java threads block on I/O. Node.js offloads ALL I/O to OS epoll/libuv without blocking main thread.",
+            javaState: { main: "WAITING", t1: "TIMED_WAITING", t2: "TIMED_WAITING", balance: 1000, lock: "UNLOCKED", core0: "IDLE", core1: "IDLE" },
+            nodeState: { callstack: [], microtasks: [], callbacks: ["I/O Ready Callbacks"], libuv: ["I/O Complete","I/O Complete","IDLE","IDLE"], balance: 1000 },
+            line: 3,
+            dictKey: "NON_BLOCKING_IO"
+          },
+          {
+            step: 4,
+            desc: "COMPLETED: Java achieves maximum CPU parallelism. Node.js achieves ultra-high I/O efficiency.",
+            javaState: { main: "TERMINATED", t1: "TERMINATED", t2: "TERMINATED", balance: 1000, lock: "UNLOCKED", core0: "IDLE", core1: "IDLE" },
+            nodeState: { callstack: [], microtasks: [], callbacks: [], libuv: ["IDLE","IDLE","IDLE","IDLE"], balance: 1000 },
+            line: 4,
+            dictKey: "THREAD_POOL"
+          }
+        ]
+      },
+
+      sim8: {
+        id: "sim8",
+        title: "8. Node.js Worker Threads vs Java Thread Pool (CPU Heavy Task)",
+        lang: "JAVA vs NODE WORKERS",
+        expected: "Fibonacci(40) Computed Without Blocking Main",
+        code: `// Heavy Calculation: Fibonacci(40)
+// Java: ExecutorService submits task to Worker Thread
+// Node.js: new Worker('./fibonacci-worker.js') spawns separate V8 Isolate!`,
+        steps: [
+          {
+            step: 1,
+            desc: "CPU Task Received. Java assigns to ThreadPool. Node spawns Worker Thread with separate V8 Isolate.",
+            javaState: { main: "RUNNABLE", t1: "RUNNING (Fib 40)", t2: "IDLE", balance: 1000, lock: "UNLOCKED", core0: "Java Worker-1", core1: "IDLE" },
+            nodeState: { callstack: ["Main JS (Free)"], microtasks: [], callbacks: [], libuv: ["Worker V8 Isolate (Fib 40)","IDLE","IDLE","IDLE"], balance: 1000 },
+            line: 1,
+            dictKey: "WORKER_THREADS"
+          },
+          {
+            step: 2,
+            desc: "Parallel Computation: Both Java worker thread and Node.js Worker Thread compute Fibonacci on background CPU cores.",
+            javaState: { main: "RUNNABLE", t1: "RUNNING (Computing...)", t2: "IDLE", balance: 1000, lock: "UNLOCKED", core0: "Java Core 0 (100% CPU)", core1: "IDLE" },
+            nodeState: { callstack: ["Main JS (Serving HTTP)"], microtasks: [], callbacks: [], libuv: ["Node Worker (100% CPU)","IDLE","IDLE","IDLE"], balance: 1000 },
+            line: 2,
+            dictKey: "PARALLELISM"
+          },
+          {
+            step: 3,
+            desc: "Node.js Worker Thread finishes computation and sends result back to main JS thread via postMessage().",
+            javaState: { main: "RUNNABLE", t1: "RUNNING", t2: "IDLE", balance: 1000, lock: "UNLOCKED", core0: "Java Core 0", core1: "IDLE" },
+            nodeState: { callstack: ["Main JS receive postMessage"], microtasks: ["parentPort.on('message')"], callbacks: [], libuv: ["IDLE","IDLE","IDLE","IDLE"], balance: 1000 },
+            line: 3,
+            dictKey: "MESSAGE_PASSING"
+          },
+          {
+            step: 4,
+            desc: "COMPLETED: Both environments computed CPU task without freezing their main user interface / event loop!",
+            javaState: { main: "TERMINATED", t1: "TERMINATED", t2: "IDLE", balance: 1000, lock: "UNLOCKED", core0: "IDLE", core1: "IDLE" },
+            nodeState: { callstack: [], microtasks: [], callbacks: [], libuv: ["IDLE","IDLE","IDLE","IDLE"], balance: 1000 },
+            line: 4,
+            dictKey: "WORKER_THREADS"
+          }
+        ]
+      }
+    };
+
+    const DICTIONARY = {
+      JVM_HEAP: {
+        title: "Java Shared Heap Memory",
+        category: "JVM Architecture",
+        desc: "The JVM heap is the runtime data area from which memory for all class instances and arrays is allocated. Because all Java threads share the same heap memory, concurrent writes without synchronization cause data races.",
+        example: "Production Example: Shared Spring Service singleton bean instance variables."
+      },
+      THREAD_SCHEDULER: {
+        title: "OS & JVM Thread Scheduler",
+        category: "OS Kernel / JVM",
+        desc: "The operating system thread scheduler assigns CPU execution time slices (preemptive multitasking) to runnable platform threads. Scheduler decisions are non-deterministic.",
+        example: "Context switching incurs CPU register saves and cache invalidation overhead (~1-5 µs)."
+      },
+      PARALLELISM: {
+        title: "Parallel Execution vs Concurrency",
+        category: "CPU Execution",
+        desc: "Parallelism means executing multiple threads simultaneously on distinct physical CPU cores. Concurrency means managing multiple tasks in overlapping time frames.",
+        example: "2 threads on 2 CPU cores = Parallelism. 200 threads on 4 CPU cores = Time-sliced Concurrency."
+      },
+      SHARED_MEMORY: {
+        title: "Shared Mutable State",
+        category: "Memory Management",
+        desc: "When multiple threads or async functions read and mutate the exact same variable without isolated memory boundaries, state consistency depends on timing.",
+        example: "Shared variable balance = 1000 modified by two concurrent requests."
+      },
+      RACE_CONDITION: {
+        title: "Race Condition (Data Race)",
+        category: "Concurrency Defect",
+        desc: "A defect where output depends on sequence or timing of uncontrollable execution steps. In Java, it happens across CPU threads; in Node.js, across async await ticks.",
+        example: "Read-Modify-Write sequence interrupted by another execution context."
+      },
+      LOST_UPDATE: {
+        title: "Lost Update Problem",
+        category: "Concurrency Anomaly",
+        desc: "Occurs when Thread A reads state X, Thread B reads state X, Thread A writes X+1, and Thread B overwrites with X+1—effectively deleting Thread A's operation.",
+        example: "Expected Balance 1200 -> Actual Balance 1100."
+      },
+      MONITOR_LOCK: {
+        title: "Java Intrinsic Monitor Lock",
+        category: "Synchronization",
+        desc: "Every Java object has an intrinsic monitor lock. A thread must acquire the monitor lock before entering a `synchronized` method or block.",
+        example: "synchronized(this) { /* critical section */ }"
+      },
+      MUTUAL_EXCLUSION: {
+        title: "Mutual Exclusion (Mutex)",
+        category: "Concurrency Safeguard",
+        desc: "Ensures that only ONE thread or asynchronous task can execute a designated critical section of code at any given moment.",
+        example: "Prevents concurrent read/write interference."
+      },
+      CRITICAL_SECTION: {
+        title: "Critical Section",
+        category: "Code Architecture",
+        desc: "A segment of code that accesses shared variables or resources and must not be concurrently accessed by more than one thread or task.",
+        example: "balance = current + amount;"
+      },
+      REENTRANT_LOCK: {
+        title: "java.util.concurrent.locks.ReentrantLock",
+        category: "Java Concurrency API",
+        desc: "An explicit lock offering advanced capabilities like tryLock(), lockInterruptibly(), and fairness policies over standard `synchronized` blocks.",
+        example: "lock.lock(); try { ... } finally { lock.unlock(); }"
+      },
+      ATOMIC_OPERATION: {
+        title: "Atomic Operations & Lock-Free CAS",
+        category: "Hardware / CPU",
+        desc: "An operation that completes as a single indivisible step using CPU Compare-And-Swap (CAS) instructions without blocking threads.",
+        example: "AtomicInteger.incrementAndGet()"
+      },
+      CALL_STACK: {
+        title: "V8 Call Stack",
+        category: "JavaScript Engine",
+        desc: "A LIFO (Last-In, First-Out) data structure that tracks active function calls in JavaScript. JavaScript is single-threaded because it has only ONE call stack.",
+        example: "Function calls are pushed; returns are popped."
+      },
+      EVENT_LOOP: {
+        title: "Node.js Event Loop",
+        category: "libuv Architecture",
+        desc: "An infinite loop that orchestrates non-blocking I/O callbacks, timers, and microtasks across different phases (Timers, Pending I/O, Poll, Check, Close).",
+        example: "Processes callbacks when call stack becomes empty."
+      },
+      MICROTASK_QUEUE: {
+        title: "Microtask Queue (Promises & process.nextTick)",
+        category: "V8 Execution",
+        desc: "High-priority queue processed IMMEDIATELY after the current Call Stack empties, before the Event Loop proceeds to next I/O phase.",
+        example: "Promise callbacks (`.then`), queueMicrotask(), process.nextTick()."
+      },
+      NON_BLOCKING_IO: {
+        title: "Asynchronous Non-Blocking I/O",
+        category: "Operating System Kernel",
+        desc: "I/O operations (sockets, files) initiated by Node.js that delegate waiting to OS kernel event mechanisms (epoll, kqueue, IOCP).",
+        example: "Node.js serves 10,000 HTTP requests on a single main JS thread."
+      },
+      LIBUV: {
+        title: "libuv C Library",
+        category: "Node.js Core Architecture",
+        desc: "The cross-platform C library underlying Node.js that provides the event loop, thread pool, and asynchronous I/O primitives.",
+        example: "Manages background thread pool (UV_THREADPOOL_SIZE default = 4)."
+      },
+      THREAD_POOL: {
+        title: "libuv Thread Pool",
+        category: "Background Execution",
+        desc: "A pool of worker threads used by libuv to handle synchronous/blocking operations that cannot be performed asynchronously by OS kernel APIs.",
+        example: "File system (fs.*), DNS lookups (getaddrinfo), crypto (pbkdf2), zlib."
+      },
+      CALLBACK_QUEUE: {
+        title: "Task / Callback Queue (Macrotasks)",
+        category: "Event Loop Queue",
+        desc: "Holds completed I/O callbacks, timer expirations (setTimeout), and setImmediate callbacks waiting for Call Stack execution.",
+        example: "setTimeout callbacks execute in Timers phase."
+      },
+      ASYNC_INTERLEAVING: {
+        title: "Async Await Interleaving",
+        category: "JavaScript Concurrency",
+        desc: "In Node.js, `await` yields execution back to the Event Loop, allowing OTHER callbacks to run on the main thread before resuming.",
+        example: "Interleaving can cause race conditions despite single-threaded JS!"
+      },
+      MUTEX: {
+        title: "Async Mutex (Node.js)",
+        category: "JS Concurrency Safeguard",
+        desc: "An in-memory lock implementation for Node.js that queues async tasks waiting for a shared critical section.",
+        example: "npm package `async-mutex`."
+      },
+      WORKER_THREADS: {
+        title: "Node.js Worker Threads (`worker_threads`) font",
+        category: "Node.js Multithreading",
+        desc: "Enables parallel JavaScript execution by launching separate V8 isolates with independent memory heaps inside the same process.",
+        example: "Used for CPU-heavy tasks like image processing or matrix calculations."
+      },
+      MESSAGE_PASSING: {
+        title: "Message Passing (Structured Clone Algorithm)",
+        category: "Worker Thread Communication",
+        desc: "Communication mechanism between Node.js main thread and Worker Threads via `postMessage()`, avoiding shared memory bugs.",
+        example: "parentPort.postMessage({ result: 42 });"
+      },
+      THREAD_SAFETY: {
+        title: "Thread Safety Principles",
+        category: "Software Architecture",
+        desc: "A program component is thread-safe if it functions correctly during simultaneous execution by multiple threads without data races.",
+        example: "Immutability, synchronized structures, atomic primitives."
+      },
+      CONTEXT_SWITCHING: {
+        title: "CPU Context Switching",
+        category: "OS Kernel Mechanics",
+        desc: "The process of storing the CPU state of a running thread and restoring the state of another thread to resume execution.",
+        example: "High thread count causes excessive context switching overhead."
+      }
+    };
+
+    // --- APPLICATION STATE ENGINE ---
+    class SimulationEngine {
+      constructor() {
+        this.currentSimId = "sim1";
+        this.currentStepIdx = 0;
+        this.isPlaying = false;
+        this.speedMultiplier = 0.5; // default 0.5x
+        this.timer = null;
+
+        this.initDOM();
+        this.bindEvents();
+        this.loadSimulation("sim1");
+      }
+
+      initDOM() {
+        this.simSelect = document.getElementById("simSelect");
+        this.btnPlayPause = document.getElementById("btnPlayPause");
+        this.playIcon = document.getElementById("playIcon");
+        this.playText = document.getElementById("playText");
+        this.btnPrev = document.getElementById("btnPrev");
+        this.btnNext = document.getElementById("btnNext");
+        this.btnReset = document.getElementById("btnReset");
+        this.speedSelect = document.getElementById("speedSelect");
+
+        this.progressBar = document.getElementById("progressBar");
+        this.stepCounter = document.getElementById("stepCounter");
+        this.statusMessage = document.getElementById("statusMessage");
+        this.simTitleLabel = document.getElementById("simTitleLabel");
+
+        this.codeBlock = document.getElementById("codeBlock");
+        this.codeLangBadge = document.getElementById("codeLangBadge");
+        this.expectedVal = document.getElementById("expectedVal");
+        this.actualVal = document.getElementById("actualVal");
+        this.executionLog = document.getElementById("executionLog");
+        this.btnClearLog = document.getElementById("btnClearLog");
+
+        this.dictTitle = document.getElementById("dictTitle");
+        this.dictCategory = document.getElementById("dictCategory");
+        this.dictDesc = document.getElementById("dictDesc");
+        this.dictExample = document.getElementById("dictExample");
+
+        this.timelineContainer = document.getElementById("timelineContainer");
+      }
+
+      bindEvents() {
+        this.simSelect.addEventListener("change", (e) => this.loadSimulation(e.target.value));
+        this.btnPlayPause.addEventListener("click", () => this.togglePlay());
+        this.btnPrev.addEventListener("click", () => this.stepBackward());
+        this.btnNext.addEventListener("click", () => this.stepForward());
+        this.btnReset.addEventListener("click", () => this.reset());
+        this.speedSelect.addEventListener("change", (e) => {
+          this.speedMultiplier = parseFloat(e.target.value);
+          if (this.isPlaying) {
+            this.pause();
+            this.play();
+          }
+        });
+        this.btnClearLog.addEventListener("click", () => {
+          this.executionLog.innerHTML = '<div class="text-slate-600 italic">[ Simulation log cleared ]</div>';
+        });
+
+        // Click on progress bar container to scrub
+        document.getElementById("progressBarContainer").addEventListener("click", (e) => {
+          const sim = SIMULATIONS[this.currentSimId];
+          const rect = e.currentTarget.getBoundingClientRect();
+          const clickX = e.clientX - rect.left;
+          const ratio = clickX / rect.width;
+          const targetStep = Math.floor(ratio * sim.steps.length);
+          this.goToStep(Math.max(0, Math.min(sim.steps.length - 1, targetStep)));
+        });
+      }
+
+      loadSimulation(simId) {
+        this.pause();
+        this.currentSimId = simId;
+        this.currentStepIdx = 0;
+
+        const sim = SIMULATIONS[simId];
+        this.simTitleLabel.textContent = sim.title;
+        this.codeLangBadge.textContent = sim.lang;
+        this.expectedVal.textContent = sim.expected;
+        this.actualVal.textContent = "In Progress...";
+
+        this.renderCode(sim.code, -1);
+        this.logMessage(`Loaded scenario: ${sim.title}`, "info");
+        this.buildTimelineGrid(sim);
+        this.goToStep(0);
+      }
+
+      renderCode(codeText, highlightLine) {
+        const lines = codeText.split('\n');
+        const formatted = lines.map((lineStr, idx) => {
+          const lineNum = idx + 1;
+          const isHighlighted = (lineNum === highlightLine);
+          const bgClass = isHighlighted ? 'bg-indigo-950/90 text-indigo-200 border-l-4 border-indigo-500 font-bold' : '';
+          return `<div class="px-2 py-0.5 rounded ${bgClass}"><span class="text-slate-600 mr-3 select-none w-4 inline-block text-right">${lineNum}</span>${this.escapeHTML(lineStr)}</div>`;
+        }).join('');
+
+        this.codeBlock.innerHTML = formatted;
+      }
+
+      escapeHTML(str) {
+        return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      }
+
+      togglePlay() {
+        if (this.isPlaying) {
+          this.pause();
+        } else {
+          this.play();
+        }
+      }
+
+      play() {
+        const sim = SIMULATIONS[this.currentSimId];
+        if (this.currentStepIdx >= sim.steps.length - 1) {
+          this.currentStepIdx = 0; // wrap around on replay
+        }
+
+        this.isPlaying = true;
+        this.playIcon.className = "fa-solid fa-pause";
+        this.playText.textContent = "Pause";
+        this.statusMessage.textContent = "Simulation running...";
+
+        const intervalMs = 2000 / this.speedMultiplier;
+        this.timer = setInterval(() => {
+          if (this.currentStepIdx < sim.steps.length - 1) {
+            this.goToStep(this.currentStepIdx + 1);
+          } else {
+            this.pause();
+            this.statusMessage.textContent = "Simulation finished";
+          }
+        }, intervalMs);
+      }
+
+      pause() {
+        this.isPlaying = false;
+        if (this.timer) clearInterval(this.timer);
+        this.timer = null;
+        this.playIcon.className = "fa-solid fa-play";
+        this.playText.textContent = "Play";
+        this.statusMessage.textContent = "Simulation paused";
+      }
+
+      reset() {
+        this.pause();
+        this.goToStep(0);
+        this.logMessage("Simulation reset to initial state.", "info");
+      }
+
+      stepForward() {
+        this.pause();
+        const sim = SIMULATIONS[this.currentSimId];
+        if (this.currentStepIdx < sim.steps.length - 1) {
+          this.goToStep(this.currentStepIdx + 1);
+        }
+      }
+
+      stepBackward() {
+        this.pause();
+        if (this.currentStepIdx > 0) {
+          this.goToStep(this.currentStepIdx - 1);
+        }
+      }
+
+      goToStep(stepIdx) {
+        this.currentStepIdx = stepIdx;
+        const sim = SIMULATIONS[this.currentSimId];
+        const stepData = sim.steps[stepIdx];
+
+        // Update progress UI
+        const pct = ((stepIdx + 1) / sim.steps.length) * 100;
+        this.progressBar.style.width = `${pct}%`;
+        this.stepCounter.textContent = `Step ${stepIdx + 1} / ${sim.steps.length}`;
+
+        // Highlight code line
+        this.renderCode(sim.code, stepData.line);
+
+        // Update UI states
+        this.updateJavaUI(stepData.javaState);
+        this.updateNodeUI(stepData.nodeState);
+        this.updateDictionary(stepData.dictKey);
+        this.updateTimelineProgress(stepIdx);
+
+        // Log step message
+        this.logMessage(`Step ${stepIdx + 1}: ${stepData.desc}`, stepIdx === sim.steps.length - 1 ? "success" : "step");
+
+        if (stepIdx === sim.steps.length - 1) {
+          this.actualVal.textContent = `Balance = ${stepData.javaState.balance || stepData.nodeState.balance}`;
+          if (stepData.dictKey === "LOST_UPDATE" || stepData.dictKey === "RACE_CONDITION") {
+            this.actualVal.className = "text-rose-400 font-bold text-sm block mt-0.5";
+          } else {
+            this.actualVal.className = "text-emerald-400 font-bold text-sm block mt-0.5";
+          }
+        }
+      }
+
+      updateJavaUI(state) {
+        if (!state) return;
+
+        // Threads
+        this.updateThreadLane("javaThreadMain", "main-thread", state.main);
+        this.updateThreadLane("javaThreadT1", "Thread-1", state.t1);
+        this.updateThreadLane("javaThreadT2", "Thread-2", state.t2);
+
+        // CPU Cores
+        const c0 = document.getElementById("javaCore0");
+        const c1 = document.getElementById("javaCore1");
+        c0.querySelector(".core-task").textContent = state.core0 || "IDLE";
+        c1.querySelector(".core-task").textContent = state.core1 || "IDLE";
+
+        c0.className = state.core0 && state.core0 !== "IDLE" ? "bg-indigo-950/90 border border-indigo-600 p-2 rounded text-center glow-active" : "bg-slate-900 border border-slate-800 p-2 rounded text-center";
+        c1.className = state.core1 && state.core1 !== "IDLE" ? "bg-indigo-950/90 border border-indigo-600 p-2 rounded text-center glow-active" : "bg-slate-900 border border-slate-800 p-2 rounded text-center";
+
+        // Balance & Lock
+        document.getElementById("javaBalanceVal").textContent = state.balance;
+        document.getElementById("javaLockStatus").textContent = `LOCK: ${state.lock}`;
+        document.getElementById("javaMonitorOwner").textContent = `State: ${state.lock}`;
+      }
+
+      updateThreadLane(elemId, name, stateText) {
+        const lane = document.getElementById(elemId);
+        if (!lane) return;
+        const badge = lane.querySelector(".state-badge");
+        const action = lane.querySelector(".thread-action");
+
+        badge.textContent = stateText;
+        badge.className = "px-2 py-0.5 rounded text-[10px] font-mono state-badge ";
+
+        if (stateText.includes("RUNNING")) badge.classList.add("state-running");
+        else if (stateText.includes("RUNNABLE")) badge.classList.add("state-runnable");
+        else if (stateText.includes("BLOCKED")) badge.classList.add("state-blocked");
+        else if (stateText.includes("WAITING")) badge.classList.add("state-waiting");
+        else badge.classList.add("state-terminated");
+
+        action.textContent = stateText;
+      }
+
+      updateNodeUI(state) {
+        if (!state) return;
+
+        // Callstack
+        const cs = document.getElementById("nodeCallStack");
+        if (state.callstack && state.callstack.length > 0) {
+          cs.innerHTML = state.callstack.map(item => `<div class="bg-indigo-950/80 text-indigo-200 border border-indigo-800 px-2 py-1 rounded text-center font-semibold">${this.escapeHTML(item)}</div>`).join('');
+          document.getElementById("nodeStackStatus").textContent = `Stack: Active (${state.callstack.length})`;
+        } else {
+          cs.innerHTML = `<div class="text-slate-500 italic text-[11px] text-center py-1">[ Call Stack Empty ]</div>`;
+          document.getElementById("nodeStackStatus").textContent = "Stack: Empty";
+        }
+
+        // Microtasks
+        const mt = document.getElementById("nodeMicrotasks");
+        document.getElementById("microtaskCount").textContent = `(${state.microtasks ? state.microtasks.length : 0})`;
+        if (state.microtasks && state.microtasks.length > 0) {
+          mt.innerHTML = state.microtasks.map(m => `<div class="bg-amber-950/80 text-amber-300 border border-amber-800 px-1.5 py-0.5 rounded text-[10px]">${this.escapeHTML(m)}</div>`).join('');
+        } else {
+          mt.innerHTML = `<div class="text-slate-600 text-[10px] text-center italic">Empty</div>`;
+        }
+
+        // Callbacks
+        const cb = document.getElementById("nodeCallbackQueue");
+        document.getElementById("callbackCount").textContent = `(${state.callbacks ? state.callbacks.length : 0})`;
+        if (state.callbacks && state.callbacks.length > 0) {
+          cb.innerHTML = state.callbacks.map(c => `<div class="bg-blue-950/80 text-blue-300 border border-blue-800 px-1.5 py-0.5 rounded text-[10px]">${this.escapeHTML(c)}</div>`).join('');
+        } else {
+          cb.innerHTML = `<div class="text-slate-600 text-[10px] text-center italic">Empty</div>`;
+        }
+
+        // libuv workers
+        if (state.libuv) {
+          for (let i = 0; i < 4; i++) {
+            const w = document.getElementById(`libuvWorker${i}`);
+            const task = state.libuv[i] || "IDLE";
+            w.textContent = `UV-${i+1}: ${task}`;
+            if (task !== "IDLE") {
+              w.className = "bg-blue-950 text-blue-300 border border-blue-600 p-1 rounded font-bold glow-active";
+            } else {
+              w.className = "bg-slate-900 p-1.5 rounded border border-slate-800 text-slate-500";
+            }
+          }
+        }
+
+        // Balance
+        document.getElementById("nodeBalanceVal").textContent = state.balance;
+      }
+
+      updateDictionary(key) {
+        if (!key || !DICTIONARY[key]) return;
+        const info = DICTIONARY[key];
+        this.dictTitle.textContent = info.title;
+        this.dictCategory.textContent = info.category;
+        this.dictDesc.textContent = info.desc;
+        
+        if (info.example) {
+          this.dictExample.classList.remove("hidden");
+          this.dictExample.textContent = info.example;
+        } else {
+          this.dictExample.classList.add("hidden");
+        }
+      }
+
+      buildTimelineGrid(sim) {
+        const lanes = sim.id.includes("node") || sim.id === "sim3" || sim.id === "sim4" || sim.id === "sim5" || sim.id === "sim6"
+          ? ["Main JS Callstack", "Microtask Queue", "Callback Queue", "libuv Pool"]
+          : ["Java Main Thread", "Java Thread-1", "Java Thread-2", "Shared Heap Lock"];
+
+        const stepsCount = sim.steps.length;
+
+        let html = '<div class="min-w-[600px] space-y-2">';
+        lanes.forEach(laneName => {
+          html += `<div class="flex items-center text-xs">
+            <span class="w-32 font-mono text-[11px] text-slate-400 truncate pr-2">${laneName}</span>
+            <div class="flex-1 grid grid-cols-${stepsCount} gap-1 bg-slate-950 p-1 rounded border border-slate-800 timeline-grid">`;
+          
+          for (let i = 0; i < stepsCount; i++) {
+            html += `<div id="tl-${laneName.replace(/[^a-zA-Z0-9]/g, '')}-${i}" class="h-5 rounded bg-slate-800/60 border border-slate-700/50 flex items-center justify-center text-[10px] font-mono text-slate-400 cursor-pointer hover:border-indigo-400 transition" onclick="simEngine.goToStep(${i})">${i+1}</div>`;
+          }
+
+          html += `</div></div>`;
+        });
+        html += '</div>';
+
+        this.timelineContainer.innerHTML = html;
+      }
+
+      updateTimelineProgress(currentStepIdx) {
+        const sim = SIMULATIONS[this.currentSimId];
+        const stepsCount = sim.steps.length;
+        
+        // Highlight active step column in timeline
+        document.querySelectorAll('[id^="tl-"]').forEach(el => {
+          el.classList.remove("bg-indigo-600", "text-white", "font-bold", "glow-active");
+          if (el.id.endsWith(`-${currentStepIdx}`)) {
+            el.classList.add("bg-indigo-600", "text-white", "font-bold", "glow-active");
+          }
+        });
+      }
+
+      logMessage(msg, type = "info") {
+        const time = new Date().toLocaleTimeString().split(' ')[0];
+        let colorClass = "text-slate-300";
+        let icon = '<i class="fa-solid fa-angle-right text-slate-500 mr-1.5"></i>';
+
+        if (type === "step") {
+          colorClass = "text-indigo-300";
+          icon = '<i class="fa-solid fa-circle-play text-indigo-400 mr-1.5"></i>';
+        } else if (type === "success") {
+          colorClass = "text-emerald-400 font-bold";
+          icon = '<i class="fa-solid fa-circle-check text-emerald-400 mr-1.5"></i>';
+        } else if (type === "warning") {
+          colorClass = "text-rose-400 font-bold";
+          icon = '<i class="fa-solid fa-triangle-exclamation text-rose-400 mr-1.5"></i>';
+        }
+
+        const logEntry = document.createElement("div");
+        logEntry.className = `leading-relaxed ${colorClass}`;
+        logEntry.innerHTML = `<span class="text-slate-600 select-none mr-1.5">[${time}]</span>${icon}${this.escapeHTML(msg)}`;
+
+        this.executionLog.appendChild(logEntry);
+        this.executionLog.scrollTop = this.executionLog.scrollHeight;
+      }
+    }
+
+    // Initialize simulation engine on load
+    let simEngine;
+    window.addEventListener("DOMContentLoaded", () => {
+      simEngine = new SimulationEngine();
+    });
+  </script>
+</body>
+</html>

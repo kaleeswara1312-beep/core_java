@@ -1,0 +1,2034 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spring Boot Architecture, Startup Lifecycle & Request Execution Simulator</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            spring: {
+              DEFAULT: '#6DB33F',
+              light: '#85d154',
+              dark: '#548d30',
+              glow: 'rgba(109, 179, 63, 0.35)'
+            },
+            dark: {
+              bg: '#0b0f17',
+              card: '#131b2e',
+              border: '#1f2d47',
+              hover: '#1a2640'
+            },
+            layer: {
+              client: '#3b82f6',
+              container: '#8b5cf6',
+              security: '#ec4899',
+              mvc: '#f59e0b',
+              app: '#10b981',
+              db: '#06b6d4'
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Custom Scrollbars */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0b0f17;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1f2d47;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #6DB33F;
+    }
+
+    /* SVG Animations & Glow */
+    .pulse-glow {
+      animation: pulseGlow 2s infinite alternate;
+    }
+    @keyframes pulseGlow {
+      0% { filter: drop-shadow(0 0 2px rgba(109, 179, 63, 0.4)); }
+      100% { filter: drop-shadow(0 0 12px rgba(109, 179, 63, 0.9)); }
+    }
+
+    .dash-array-anim {
+      stroke-dasharray: 8, 8;
+      animation: dashMove 1s linear infinite;
+    }
+    @keyframes dashMove {
+      to { stroke-dashoffset: -16; }
+    }
+
+    .node-active {
+      stroke: #6DB33F !important;
+      stroke-width: 3px !important;
+      filter: drop-shadow(0 0 10px rgba(109, 179, 63, 0.8));
+    }
+    .node-active-error {
+      stroke: #ef4444 !important;
+      stroke-width: 3px !important;
+      filter: drop-shadow(0 0 10px rgba(239, 68, 68, 0.8));
+    }
+
+    /* Tab styling */
+    .tab-btn.active {
+      background-color: #6DB33F !important;
+      color: #000000 !important;
+      font-weight: 700 !important;
+    }
+
+    /* Animated Packet */
+    #requestPacketAnim {
+      transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+      filter: drop-shadow(0 0 8px currentColor);
+    }
+  </style>
+</head>
+<body class="bg-dark-bg text-slate-200 font-sans min-h-screen flex flex-col selection:bg-spring selection:text-black antialiased overflow-x-hidden">
+
+  <!-- TOP HEADER & NAV BAR -->
+  <header class="sticky top-0 z-50 bg-dark-card/90 backdrop-blur border-b border-dark-border px-4 py-3">
+    <div class="max-w-7xl mx-auto flex flex-col lg:flex-row items-center justify-between gap-4">
+      <!-- Title & Logo -->
+      <div class="flex items-center space-x-3 w-full lg:w-auto justify-between lg:justify-start">
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-xl bg-spring/20 border border-spring/50 flex items-center justify-center text-spring font-bold text-xl shadow-lg shadow-spring/10">
+            <i class="fa-solid fa-leaf"></i>
+          </div>
+          <div>
+            <h1 class="text-lg font-bold text-white tracking-wide flex items-center gap-2">
+              Spring Boot Unified Master Simulator
+              <span class="text-xs font-mono bg-spring/20 text-spring border border-spring/40 px-2 py-0.5 rounded-full">Spring Boot 3.x</span>
+            </h1>
+            <p class="text-xs text-slate-400">Startup Internals, Environment Creation & Request Execution Flow</p>
+          </div>
+        </div>
+        <!-- Voice Narrator Audio Toggle (Header Quick Toggle) -->
+        <button id="globalAudioBtn" onclick="toggleAudio()" class="lg:hidden bg-dark-bg border border-dark-border px-3 py-1.5 rounded-lg text-xs font-medium text-slate-300 flex items-center gap-2">
+          <i id="globalAudioIcon" class="fa-solid fa-volume-xmark text-slate-400"></i>
+          <span id="globalAudioText">Voice OFF</span>
+        </button>
+        <!-- Mobile Menu Toggle Button -->
+        <button id="mobileNavToggle" class="lg:hidden p-2 text-slate-400 hover:text-white focus:outline-none">
+          <i class="fa-solid fa-bars text-xl"></i>
+        </button>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav id="navTabs" class="hidden lg:flex flex-wrap gap-1.5 justify-center w-full lg:w-auto">
+        <button onclick="switchTab('module1')" data-tab="module1" class="tab-btn active text-xs font-medium px-3 py-1.5 rounded-lg border border-dark-border text-slate-300 transition-all flex items-center gap-1.5">
+          <i class="fa-solid fa-power-off text-xs"></i> 1. Startup Pipeline
+        </button>
+        <button onclick="switchTab('module2')" data-tab="module2" class="tab-btn text-xs font-medium px-3 py-1.5 rounded-lg border border-dark-border text-slate-300 transition-all flex items-center gap-1.5">
+          <i class="fa-solid fa-cubes text-xs"></i> 2. @SpringBootApp
+        </button>
+        <button onclick="switchTab('module3')" data-tab="module3" class="tab-btn text-xs font-medium px-3 py-1.5 rounded-lg border border-dark-border text-slate-300 transition-all flex items-center gap-1.5">
+          <i class="fa-solid fa-code-compare text-xs"></i> 3. Scan vs Auto-Config
+        </button>
+        <button onclick="switchTab('module4')" data-tab="module4" class="tab-btn text-xs font-medium px-3 py-1.5 rounded-lg border border-dark-border text-slate-300 transition-all flex items-center gap-1.5">
+          <i class="fa-solid fa-diagram-project text-xs"></i> 4. IoC & DI Graph
+        </button>
+        <button onclick="switchTab('module5')" data-tab="module5" class="tab-btn text-xs font-medium px-3 py-1.5 rounded-lg border border-dark-border text-slate-300 transition-all flex items-center gap-1.5">
+          <i class="fa-solid fa-sliders text-xs"></i> 5. Back-off Simulator
+        </button>
+        <button onclick="switchTab('module6')" data-tab="module6" class="tab-btn text-xs font-medium px-3 py-1.5 rounded-lg border border-dark-border text-slate-300 transition-all flex items-center gap-1.5">
+          <i class="fa-solid fa-network-wired text-xs"></i> 6. Request Lifecycle
+        </button>
+        <button onclick="switchTab('module7')" data-tab="module7" class="tab-btn text-xs font-medium px-3 py-1.5 rounded-lg border border-dark-border text-slate-300 transition-all flex items-center gap-1.5">
+          <i class="fa-solid fa-table-columns text-xs"></i> 7. Security Matrix
+        </button>
+        <button onclick="switchTab('module8')" data-tab="module8" class="tab-btn text-xs font-medium px-3 py-1.5 rounded-lg border border-dark-border text-slate-300 transition-all flex items-center gap-1.5">
+          <i class="fa-solid fa-user-ninja text-xs"></i> 8. Architect Q&A (20+)
+        </button>
+        <button onclick="switchTab('module9')" data-tab="module9" class="tab-btn text-xs font-medium px-3 py-1.5 rounded-lg border border-dark-border text-slate-300 transition-all flex items-center gap-1.5">
+          <i class="fa-solid fa-vial text-xs"></i> 9. Quiz Evaluator
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- MAIN CONTENT AREA -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
+
+    <!-- ========================================== -->
+    <!-- MODULE 1: 12-STEP STARTUP LIFECYCLE -->
+    <!-- ========================================== -->
+    <section id="module1" class="tab-content space-y-6">
+      <!-- Section Header & Playback Controls -->
+      <div class="bg-dark-card border border-dark-border rounded-xl p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-xl">
+        <div>
+          <h2 class="text-xl font-bold text-white flex items-center gap-2">
+            <span class="text-spring"><i class="fa-solid fa-power-off"></i></span> 
+            Module 1: 12-Step Spring Application Startup Pipeline
+          </h2>
+          <p class="text-xs text-slate-400 mt-1">
+            Visualizing execution from <code class="text-spring font-mono">SpringApplication.run(MyApplication.class, args)</code> to web server readiness.
+          </p>
+        </div>
+        
+        <!-- Global Controls -->
+        <div class="flex flex-wrap items-center gap-2 bg-dark-bg p-2 rounded-lg border border-dark-border w-full md:w-auto">
+          <!-- Voice Narrator Button -->
+          <button id="m1AudioBtn" onclick="toggleAudio()" class="px-3 py-1.5 rounded border border-dark-border bg-dark-card hover:bg-dark-hover text-slate-300 transition flex items-center gap-1.5 text-xs">
+            <i id="m1AudioIcon" class="fa-solid fa-volume-xmark text-slate-400"></i>
+            <span id="m1AudioText">Voice OFF</span>
+          </button>
+
+          <div class="h-4 w-px bg-dark-border mx-1"></div>
+
+          <button id="m1PrevBtn" onclick="m1PrevStep()" class="p-2 rounded hover:bg-dark-hover text-slate-300 transition" title="Previous Step">
+            <i class="fa-solid fa-step-backward"></i>
+          </button>
+          <button id="m1PlayBtn" onclick="m1TogglePlay()" class="px-3 py-1.5 rounded bg-spring text-black font-bold hover:bg-spring-light transition flex items-center gap-1 text-xs">
+            <i class="fa-solid fa-play" id="m1PlayIcon"></i> <span id="m1PlayText">Play Animation</span>
+          </button>
+          <button id="m1NextBtn" onclick="m1NextStep()" class="p-2 rounded hover:bg-dark-hover text-slate-300 transition" title="Next Step">
+            <i class="fa-solid fa-step-forward"></i>
+          </button>
+          <button onclick="m1Reset()" class="p-2 rounded hover:bg-dark-hover text-slate-400 hover:text-white transition" title="Reset">
+            <i class="fa-solid fa-rotate-right"></i>
+          </button>
+          
+          <div class="h-4 w-px bg-dark-border mx-1"></div>
+
+          <!-- Speed Controls -->
+          <div class="flex items-center text-xs font-mono gap-1 text-slate-400">
+            <span>Speed:</span>
+            <button onclick="setSpeed(0.5)" id="speed-0.5" class="speed-btn px-1.5 py-0.5 rounded border border-dark-border">0.5x</button>
+            <button onclick="setSpeed(1.0)" id="speed-1" class="speed-btn px-1.5 py-0.5 rounded border border-spring text-spring font-bold">1x</button>
+            <button onclick="setSpeed(2.0)" id="speed-2" class="speed-btn px-1.5 py-0.5 rounded border border-dark-border">2x</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step Progress Bar -->
+      <div class="bg-dark-card border border-dark-border rounded-xl p-4 shadow-lg">
+        <div class="flex justify-between items-center text-xs font-mono text-slate-400 mb-2">
+          <span>STARTUP SEQUENCE PROGRESS</span>
+          <span id="m1StepCounter" class="text-spring font-bold">Step 1 of 12</span>
+        </div>
+        <div class="w-full bg-dark-bg h-2.5 rounded-full overflow-hidden border border-dark-border">
+          <div id="m1ProgressBar" class="bg-spring h-full transition-all duration-300" style="width: 8.33%;"></div>
+        </div>
+      </div>
+
+      <!-- Interactive Grid: Diagram (Left) & Deep Explanation Card (Right) -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <!-- Left: SVG Step Flow Diagram -->
+        <div class="lg:col-span-7 bg-dark-card border border-dark-border rounded-xl p-4 flex flex-col justify-between relative overflow-hidden min-h-[450px]">
+          <h3 class="text-xs font-mono uppercase tracking-wider text-slate-400 mb-4 flex items-center justify-between">
+            <span>Internal Execution Path</span>
+            <span class="text-spring text-[10px]"><i class="fa-solid fa-circle-dot animate-pulse"></i> Interactive Nodes</span>
+          </h3>
+
+          <!-- SVG Flow Map -->
+          <svg id="m1FlowSvg" viewBox="0 0 700 480" class="w-full h-auto">
+            <defs>
+              <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#1f2d47"/>
+              </marker>
+              <marker id="arrow-active" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#6DB33F"/>
+              </marker>
+            </defs>
+
+            <!-- Line paths connecting 12 nodes in 3 rows -->
+            <!-- Row 1: Steps 1->2->3->4 -->
+            <line x1="100" y1="60" x2="220" y2="60" stroke="#1f2d47" stroke-width="3" id="m1Line1" marker-end="url(#arrow)" />
+            <line x1="280" y1="60" x2="400" y2="60" stroke="#1f2d47" stroke-width="3" id="m1Line2" marker-end="url(#arrow)" />
+            <line x1="460" y1="60" x2="580" y2="60" stroke="#1f2d47" stroke-width="3" id="m1Line3" marker-end="url(#arrow)" />
+            
+            <!-- Turn Row 1 to Row 2 -->
+            <path d="M 610 85 L 610 175" stroke="#1f2d47" stroke-width="3" fill="none" id="m1Line4" marker-end="url(#arrow)" />
+
+            <!-- Row 2: Steps 8<-7<-6<-5 -->
+            <line x1="580" y1="200" x2="460" y2="200" stroke="#1f2d47" stroke-width="3" id="m1Line5" marker-end="url(#arrow)" />
+            <line x1="400" y1="200" x2="280" y2="200" stroke="#1f2d47" stroke-width="3" id="m1Line6" marker-end="url(#arrow)" />
+            <line x1="220" y1="200" x2="100" y2="200" stroke="#1f2d47" stroke-width="3" id="m1Line7" marker-end="url(#arrow)" />
+
+            <!-- Turn Row 2 to Row 3 -->
+            <path d="M 70 225 L 70 315" stroke="#1f2d47" stroke-width="3" fill="none" id="m1Line8" marker-end="url(#arrow)" />
+
+            <!-- Row 3: Steps 9->10->11->12 -->
+            <line x1="100" y1="340" x2="220" y2="340" stroke="#1f2d47" stroke-width="3" id="m1Line9" marker-end="url(#arrow)" />
+            <line x1="280" y1="340" x2="400" y2="340" stroke="#1f2d47" stroke-width="3" id="m1Line10" marker-end="url(#arrow)" />
+            <line x1="460" y1="340" x2="580" y2="340" stroke="#1f2d47" stroke-width="3" id="m1Line11" marker-end="url(#arrow)" />
+
+            <!-- Nodes (1 to 12) -->
+            <!-- Step 1 -->
+            <g class="cursor-pointer m1-node" onclick="m1SelectStep(1)" id="m1Node1">
+              <rect x="20" y="30" width="80" height="60" rx="8" fill="#131b2e" stroke="#1f2d47" stroke-width="2"/>
+              <text x="60" y="58" text-anchor="middle" fill="#6DB33F" font-weight="bold" font-size="12">STEP 1</text>
+              <text x="60" y="75" text-anchor="middle" fill="#94a3b8" font-size="10">JVM Start</text>
+            </g>
+
+            <!-- Step 2 -->
+            <g class="cursor-pointer m1-node" onclick="m1SelectStep(2)" id="m1Node2">
+              <rect x="200" y="30" width="80" height="60" rx="8" fill="#131b2e" stroke="#1f2d47" stroke-width="2"/>
+              <text x="240" y="58" text-anchor="middle" fill="#6DB33F" font-weight="bold" font-size="12">STEP 2</text>
+              <text x="240" y="75" text-anchor="middle" fill="#94a3b8" font-size="10">App Prep</text>
+            </g>
+
+            <!-- Step 3 -->
+            <g class="cursor-pointer m1-node" onclick="m1SelectStep(3)" id="m1Node3">
+              <rect x="380" y="30" width="80" height="60" rx="8" fill="#131b2e" stroke="#1f2d47" stroke-width="2"/>
+              <text x="420" y="58" text-anchor="middle" fill="#6DB33F" font-weight="bold" font-size="12">STEP 3</text>
+              <text x="420" y="75" text-anchor="middle" fill="#94a3b8" font-size="10">Context Init</text>
+            </g>
+
+            <!-- Step 4 -->
+            <g class="cursor-pointer m1-node" onclick="m1SelectStep(4)" id="m1Node4">
+              <rect x="570" y="30" width="80" height="60" rx="8" fill="#131b2e" stroke="#1f2d47" stroke-width="2"/>
+              <text x="610" y="58" text-anchor="middle" fill="#6DB33F" font-weight="bold" font-size="12">STEP 4</text>
+              <text x="610" y="75" text-anchor="middle" fill="#94a3b8" font-size="10">Environment</text>
+            </g>
+
+            <!-- Step 5 -->
+            <g class="cursor-pointer m1-node" onclick="m1SelectStep(5)" id="m1Node5">
+              <rect x="570" y="170" width="80" height="60" rx="8" fill="#131b2e" stroke="#1f2d47" stroke-width="2"/>
+              <text x="610" y="198" text-anchor="middle" fill="#6DB33F" font-weight="bold" font-size="12">STEP 5</text>
+              <text x="610" y="215" text-anchor="middle" fill="#94a3b8" font-size="10">Config Class</text>
+            </g>
+
+            <!-- Step 6 -->
+            <g class="cursor-pointer m1-node" onclick="m1SelectStep(6)" id="m1Node6">
+              <rect x="380" y="170" width="80" height="60" rx="8" fill="#131b2e" stroke="#1f2d47" stroke-width="2"/>
+              <text x="420" y="198" text-anchor="middle" fill="#6DB33F" font-weight="bold" font-size="12">STEP 6</text>
+              <text x="420" y="215" text-anchor="middle" fill="#94a3b8" font-size="10">Comp Scan</text>
+            </g>
+
+            <!-- Step 7 -->
+            <g class="cursor-pointer m1-node" onclick="m1SelectStep(7)" id="m1Node7">
+              <rect x="200" y="170" width="80" height="60" rx="8" fill="#131b2e" stroke="#1f2d47" stroke-width="2"/>
+              <text x="240" y="198" text-anchor="middle" fill="#6DB33F" font-weight="bold" font-size="12">STEP 7</text>
+              <text x="240" y="215" text-anchor="middle" fill="#94a3b8" font-size="10">Bean Defs</text>
+            </g>
+
+            <!-- Step 8 -->
+            <g class="cursor-pointer m1-node" onclick="m1SelectStep(8)" id="m1Node8">
+              <rect x="20" y="170" width="80" height="60" rx="8" fill="#131b2e" stroke="#1f2d47" stroke-width="2"/>
+              <text x="60" y="198" text-anchor="middle" fill="#6DB33F" font-weight="bold" font-size="12">STEP 8</text>
+              <text x="60" y="215" text-anchor="middle" fill="#94a3b8" font-size="10">Auto-Config</text>
+            </g>
+
+            <!-- Step 9 -->
+            <g class="cursor-pointer m1-node" onclick="m1SelectStep(9)" id="m1Node9">
+              <rect x="20" y="310" width="80" height="60" rx="8" fill="#131b2e" stroke="#1f2d47" stroke-width="2"/>
+              <text x="60" y="338" text-anchor="middle" fill="#6DB33F" font-weight="bold" font-size="12">STEP 9</text>
+              <text x="60" y="355" text-anchor="middle" fill="#94a3b8" font-size="10">Instantiat & DI</text>
+            </g>
+
+            <!-- Step 10 -->
+            <g class="cursor-pointer m1-node" onclick="m1SelectStep(10)" id="m1Node10">
+              <rect x="200" y="310" width="80" height="60" rx="8" fill="#131b2e" stroke="#1f2d47" stroke-width="2"/>
+              <text x="240" y="338" text-anchor="middle" fill="#6DB33F" font-weight="bold" font-size="12">STEP 10</text>
+              <text x="240" y="355" text-anchor="middle" fill="#94a3b8" font-size="10">Bean Lifecycle</text>
+            </g>
+
+            <!-- Step 11 -->
+            <g class="cursor-pointer m1-node" onclick="m1SelectStep(11)" id="m1Node11">
+              <rect x="380" y="310" width="80" height="60" rx="8" fill="#131b2e" stroke="#1f2d47" stroke-width="2"/>
+              <text x="420" y="338" text-anchor="middle" fill="#6DB33F" font-weight="bold" font-size="12">STEP 11</text>
+              <text x="420" y="355" text-anchor="middle" fill="#94a3b8" font-size="10">Tomcat Start</text>
+            </g>
+
+            <!-- Step 12 -->
+            <g class="cursor-pointer m1-node" onclick="m1SelectStep(12)" id="m1Node12">
+              <rect x="570" y="310" width="80" height="60" rx="8" fill="#131b2e" stroke="#1f2d47" stroke-width="2"/>
+              <text x="610" y="338" text-anchor="middle" fill="#6DB33F" font-weight="bold" font-size="12">STEP 12</text>
+              <text x="610" y="355" text-anchor="middle" fill="#94a3b8" font-size="10">App Ready</text>
+            </g>
+          </svg>
+
+          <div class="text-[11px] text-slate-500 text-center italic mt-2">
+            Click any node to inspect architectural mechanics & internal source-level behaviors.
+          </div>
+        </div>
+
+        <!-- Right: Step Explanation Panel -->
+        <div class="lg:col-span-5 bg-dark-card border border-dark-border rounded-xl p-5 flex flex-col justify-between space-y-4 shadow-xl">
+          <div>
+            <div class="flex items-center justify-between border-b border-dark-border pb-3 mb-3">
+              <span id="m1StepBadge" class="bg-spring/20 text-spring font-mono text-xs px-2.5 py-1 rounded-md border border-spring/40 font-bold">
+                STEP 1 OF 12
+              </span>
+              <span id="m1StepClass" class="text-xs font-mono text-slate-400">
+                java.lang.System
+              </span>
+            </div>
+
+            <h3 id="m1StepTitle" class="text-lg font-bold text-white mb-2">
+              JVM Initialization & Main Method Execution
+            </h3>
+
+            <p id="m1StepDesc" class="text-xs text-slate-300 leading-relaxed mb-4">
+              The Java Virtual Machine launches, loads the main application class into memory, and executes the static main method.
+            </p>
+
+            <!-- Internal Classes / Key Interfaces Involved -->
+            <div class="space-y-2 mb-4">
+              <div class="text-xs font-mono text-slate-400 uppercase tracking-wider">Key Framework Components:</div>
+              <div id="m1Components" class="flex flex-wrap gap-1.5">
+                <!-- Badges dynamically updated -->
+              </div>
+            </div>
+
+            <!-- Architectural Explanation Box -->
+            <div class="bg-dark-bg p-3.5 rounded-lg border border-dark-border space-y-2">
+              <div class="text-xs font-bold text-spring flex items-center gap-1.5">
+                <i class="fa-solid fa-microchip"></i> Architect Insight:
+              </div>
+              <div id="m1ArchitectNotes" class="text-xs text-slate-300 font-mono leading-relaxed space-y-1">
+                <!-- Content dynamically populated -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Code Snippet Container -->
+          <div class="bg-dark-bg rounded-lg p-3 border border-dark-border">
+            <div class="text-[11px] font-mono text-slate-400 mb-1 flex justify-between">
+              <span>SOURCE / INTERNAL REFERENCE</span>
+              <span class="text-spring">Java 17+ / Boot 3.x</span>
+            </div>
+            <pre id="m1CodeSnippet" class="text-xs font-mono text-emerald-400 overflow-x-auto p-2 bg-black/40 rounded">
+// Code snippet loading...
+            </pre>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- MODULE 2: @SpringBootApplication ANNOTATION -->
+    <!-- ========================================== -->
+    <section id="module2" class="tab-content hidden space-y-6">
+      <div class="bg-dark-card border border-dark-border rounded-xl p-5 shadow-xl">
+        <h2 class="text-xl font-bold text-white flex items-center gap-2">
+          <span class="text-spring"><i class="fa-solid fa-cubes"></i></span> 
+          Module 2: Deconstructing @SpringBootApplication Meta-Annotation
+        </h2>
+        <p class="text-xs text-slate-400 mt-1">
+          <code class="text-spring font-mono">@SpringBootApplication</code> is a composite annotation bundling three core configuration mechanisms. Click any node to examine its design intent.
+        </p>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- SVG Interactive Tree -->
+        <div class="lg:col-span-6 bg-dark-card border border-dark-border rounded-xl p-5 flex flex-col items-center justify-center min-h-[400px]">
+          <svg viewBox="0 0 500 360" class="w-full h-auto">
+            <!-- Central Meta-Annotation -->
+            <g class="cursor-pointer" onclick="m2Select('main')">
+              <rect x="150" y="20" width="200" height="55" rx="10" fill="#131b2e" stroke="#6DB33F" stroke-width="2" id="m2MainBox"/>
+              <text x="250" y="52" text-anchor="middle" fill="#6DB33F" font-weight="bold" font-size="14">@SpringBootApplication</text>
+            </g>
+
+            <!-- Connecting Branch Lines -->
+            <path d="M 250 75 L 250 120 M 250 120 L 90 120 L 90 170 M 250 120 L 250 170 M 250 120 L 410 120 L 410 170" stroke="#1f2d47" stroke-width="3" fill="none" class="dash-array-anim"/>
+
+            <!-- Node 1: @SpringBootConfiguration -->
+            <g class="cursor-pointer" onclick="m2Select('config')">
+              <rect x="10" y="170" width="160" height="70" rx="8" fill="#131b2e" stroke="#1f2d47" stroke-width="2" id="m2ConfigBox"/>
+              <text x="90" y="200" text-anchor="middle" fill="#38bdf8" font-weight="bold" font-size="11">@SpringBootConfiguration</text>
+              <text x="90" y="222" text-anchor="middle" fill="#94a3b8" font-size="9">Extends @Configuration</text>
+            </g>
+
+            <!-- Node 2: @EnableAutoConfiguration -->
+            <g class="cursor-pointer" onclick="m2Select('auto')">
+              <rect x="170" y="170" width="160" height="70" rx="8" fill="#131b2e" stroke="#1f2d47" stroke-width="2" id="m2AutoBox"/>
+              <text x="250" y="200" text-anchor="middle" fill="#a855f7" font-weight="bold" font-size="11">@EnableAutoConfiguration</text>
+              <text x="250" y="222" text-anchor="middle" fill="#94a3b8" font-size="9">Triggers Auto-Configs</text>
+            </g>
+
+            <!-- Node 3: @ComponentScan -->
+            <g class="cursor-pointer" onclick="m2Select('scan')">
+              <rect x="330" y="170" width="160" height="70" rx="8" fill="#131b2e" stroke="#1f2d47" stroke-width="2" id="m2ScanBox"/>
+              <text x="410" y="200" text-anchor="middle" fill="#f59e0b" font-weight="bold" font-size="11">@ComponentScan</text>
+              <text x="410" y="222" text-anchor="middle" fill="#94a3b8" font-size="9">Package Stereotypes</text>
+            </g>
+
+            <!-- Sub-elements / SPI Indicator -->
+            <path d="M 250 240 L 250 280" stroke="#a855f7" stroke-width="2" stroke-dasharray="4,4"/>
+            <rect x="160" y="280" width="180" height="40" rx="6" fill="#0b0f17" stroke="#a855f7" stroke-width="1"/>
+            <text x="250" y="304" text-anchor="middle" fill="#a855f7" font-mono font-size="10">AutoConfigurationImportSelector</text>
+          </svg>
+        </div>
+
+        <!-- Annotation Detail Card -->
+        <div class="lg:col-span-6 bg-dark-card border border-dark-border rounded-xl p-5 flex flex-col justify-between space-y-4 shadow-xl">
+          <div>
+            <span id="m2Badge" class="bg-spring/20 text-spring font-mono text-xs px-2.5 py-1 rounded-md border border-spring/40 font-bold uppercase">
+              Composite Annotation Overview
+            </span>
+            
+            <h3 id="m2Title" class="text-xl font-bold text-white mt-3 mb-2">
+              @SpringBootApplication Architecture
+            </h3>
+
+            <p id="m2Desc" class="text-xs text-slate-300 leading-relaxed mb-4">
+              Serves as the primary entrypoint for Spring Boot applications. It combines configuration class semantics, automated classpath auto-configuration enablement, and package-level component scanning into a single directive.
+            </p>
+
+            <div class="bg-dark-bg p-4 rounded-lg border border-dark-border space-y-2">
+              <h4 class="text-xs font-bold text-spring uppercase tracking-wider">Internal Specification & Rules:</h4>
+              <ul id="m2Rules" class="text-xs text-slate-300 space-y-2 list-disc list-inside">
+                <li>Equivalent to explicitly specifying <code class="text-spring">@Configuration</code>, <code class="text-spring">@EnableAutoConfiguration</code>, and <code class="text-spring">@ComponentScan</code>.</li>
+                <li>Base package scanning defaults to the package containing the annotated main application class.</li>
+                <li>Allows disabling specific auto-configurations via <code class="text-spring">exclude = {DataSourceAutoConfiguration.class}</code>.</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="bg-dark-bg p-3 rounded-lg border border-dark-border">
+            <div class="text-[11px] font-mono text-slate-400 mb-1">EQUIVALENT EXPRESSION IN RAW SPRING:</div>
+            <pre id="m2Code" class="text-xs font-mono text-spring p-2 bg-black/40 rounded overflow-x-auto">
+@Configuration
+@EnableAutoConfiguration
+@ComponentScan(basePackages = "com.example.ecommerce")
+public class MyApplication { ... }
+            </pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- MODULE 3: COMPONENT SCANNING VS AUTO-CONFIG -->
+    <!-- ========================================== -->
+    <section id="module3" class="tab-content hidden space-y-6">
+      <div class="bg-dark-card border border-dark-border rounded-xl p-5 shadow-xl">
+        <h2 class="text-xl font-bold text-white flex items-center gap-2">
+          <span class="text-spring"><i class="fa-solid fa-code-compare"></i></span> 
+          Module 3: Component Scanning vs Auto-Configuration
+        </h2>
+        <p class="text-xs text-slate-400 mt-1">
+          A side-by-side architectural comparison of application code discovery versus framework auto-configuration.
+        </p>
+      </div>
+
+      <!-- Side by Side Comparison Grid -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Component Scanning Box -->
+        <div class="bg-dark-card border border-dark-border rounded-xl p-5 flex flex-col justify-between space-y-4 shadow-xl">
+          <div>
+            <div class="flex items-center justify-between border-b border-dark-border pb-3 mb-3">
+              <h3 class="text-lg font-bold text-amber-400 flex items-center gap-2">
+                <i class="fa-solid fa-folder-tree"></i> Component Scanning
+              </h3>
+              <span class="text-xs font-mono bg-amber-400/20 text-amber-400 px-2 py-0.5 rounded border border-amber-400/30">Application Code</span>
+            </div>
+
+            <p class="text-xs text-slate-300 leading-relaxed mb-4">
+              Scans user-created classes within specified base packages for Spring stereotypes (<code class="text-amber-400">@Component</code>, <code class="text-amber-400">@Service</code>, <code class="text-amber-400">@Repository</code>, <code class="text-amber-400">@Controller</code>) and registers their <code class="text-amber-400">BeanDefinition</code>s.
+            </p>
+
+            <table class="w-full text-xs text-left border-collapse">
+              <tr class="border-b border-dark-border">
+                <td class="py-2 text-slate-400 font-mono">Trigger:</td>
+                <td class="py-2 text-slate-200 font-mono">@ComponentScan / @SpringBootApplication</td>
+              </tr>
+              <tr class="border-b border-dark-border">
+                <td class="py-2 text-slate-400 font-mono">Discovery Scope:</td>
+                <td class="py-2 text-slate-200 font-mono">Package Hierarchy (e.g. com.example.app)</td>
+              </tr>
+              <tr class="border-b border-dark-border">
+                <td class="py-2 text-slate-400 font-mono">Execution Timing:</td>
+                <td class="py-2 text-slate-200 font-mono">Early Context Refresh Phase</td>
+              </tr>
+              <tr>
+                <td class="py-2 text-slate-400 font-mono">Conditionality:</td>
+                <td class="py-2 text-slate-200 font-mono">Unconditional (Unless @Conditional used)</td>
+              </tr>
+            </table>
+          </div>
+
+          <div class="bg-dark-bg p-3 rounded-lg border border-dark-border font-mono text-xs text-amber-300">
+            @Service<br>
+            public class OrderService {<br>
+            &nbsp;&nbsp;private final OrderRepository repo;<br>
+            }
+          </div>
+        </div>
+
+        <!-- Auto-Configuration Box -->
+        <div class="bg-dark-card border border-dark-border rounded-xl p-5 flex flex-col justify-between space-y-4 shadow-xl">
+          <div>
+            <div class="flex items-center justify-between border-b border-dark-border pb-3 mb-3">
+              <h3 class="text-lg font-bold text-purple-400 flex items-center gap-2">
+                <i class="fa-solid fa-wand-magic-sparkles"></i> Auto-Configuration
+              </h3>
+              <span class="text-xs font-mono bg-purple-400/20 text-purple-400 px-2 py-0.5 rounded border border-purple-400/30">Framework / Starters</span>
+            </div>
+
+            <p class="text-xs text-slate-300 leading-relaxed mb-4">
+              Discovers third-party and framework configuration classes registered in imports SPI files (<code class="text-purple-400">META-INF/spring/...AutoConfiguration.imports</code>) and evaluates conditional annotations before creating beans.
+            </p>
+
+            <table class="w-full text-xs text-left border-collapse">
+              <tr class="border-b border-dark-border">
+                <td class="py-2 text-slate-400 font-mono">Trigger:</td>
+                <td class="py-2 text-slate-200 font-mono">@EnableAutoConfiguration / AutoConfigurationImportSelector</td>
+              </tr>
+              <tr class="border-b border-dark-border">
+                <td class="py-2 text-slate-400 font-mono">Discovery Scope:</td>
+                <td class="py-2 text-slate-200 font-mono">Classpath Libraries / Starters</td>
+              </tr>
+              <tr class="border-b border-dark-border">
+                <td class="py-2 text-slate-400 font-mono">Execution Timing:</td>
+                <td class="py-2 text-slate-200 font-mono">After User BeanDefinitions Loaded</td>
+              </tr>
+              <tr>
+                <td class="py-2 text-slate-400 font-mono">Conditionality:</td>
+                <td class="py-2 text-slate-200 font-mono">Highly Conditional (@ConditionalOnMissingBean etc.)</td>
+              </tr>
+            </table>
+          </div>
+
+          <div class="bg-dark-bg p-3 rounded-lg border border-dark-border font-mono text-xs text-purple-300">
+            @AutoConfiguration<br>
+            @ConditionalOnClass(HikariDataSource.class)<br>
+            @ConditionalOnMissingBean(DataSource.class)<br>
+            public class DataSourceAutoConfiguration { ... }
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- MODULE 4: DEPENDENCY INJECTION & IOC GRAPH -->
+    <!-- ========================================== -->
+    <section id="module4" class="tab-content hidden space-y-6">
+      <div class="bg-dark-card border border-dark-border rounded-xl p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-xl">
+        <div>
+          <h2 class="text-xl font-bold text-white flex items-center gap-2">
+            <span class="text-spring"><i class="fa-solid fa-diagram-project"></i></span> 
+            Module 4: Inversion of Control & Dependency Resolution
+          </h2>
+          <p class="text-xs text-slate-400 mt-1">
+            Compare traditional imperative instantiation using <code class="text-slate-300 font-mono">new</code> versus Spring IoC container resolution.
+          </p>
+        </div>
+
+        <!-- Mode Selector -->
+        <div class="flex items-center gap-2 bg-dark-bg p-1.5 rounded-lg border border-dark-border">
+          <button onclick="m4SetMode('traditional')" id="m4BtnTrad" class="px-3 py-1.5 rounded text-xs font-mono transition border border-transparent text-slate-400">
+            Traditional (Manual Java)
+          </button>
+          <button onclick="m4SetMode('spring')" id="m4BtnSpring" class="px-3 py-1.5 rounded text-xs font-mono bg-spring text-black font-bold transition">
+            Spring IoC Container
+          </button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- Visualization Area -->
+        <div class="lg:col-span-7 bg-dark-card border border-dark-border rounded-xl p-5 flex flex-col items-center justify-center min-h-[400px]">
+          <svg viewBox="0 0 600 350" class="w-full h-auto" id="m4Svg">
+            <!-- OrderController -->
+            <g id="m4NodeCtrl">
+              <rect x="35" y="140" width="120" height="70" rx="8" fill="#131b2e" stroke="#38bdf8" stroke-width="2"/>
+              <text x="95" y="170" text-anchor="middle" fill="#38bdf8" font-weight="bold" font-size="11">OrderController</text>
+              <text x="95" y="190" text-anchor="middle" fill="#94a3b8" font-size="9">@RestController</text>
+            </g>
+
+            <!-- Arrow 1 -->
+            <path d="M 155 175 L 215 175" stroke="#6DB33F" stroke-width="3" id="m4Arrow1" marker-end="url(#arrow-active)"/>
+
+            <!-- OrderService -->
+            <g id="m4NodeSvc">
+              <rect x="225" y="140" width="120" height="70" rx="8" fill="#131b2e" stroke="#6DB33F" stroke-width="2"/>
+              <text x="285" y="170" text-anchor="middle" fill="#6DB33F" font-weight="bold" font-size="11">OrderService</text>
+              <text x="285" y="190" text-anchor="middle" fill="#94a3b8" font-size="9">@Service</text>
+            </g>
+
+            <!-- Arrow 2 -->
+            <path d="M 345 175 L 405 175" stroke="#6DB33F" stroke-width="3" id="m4Arrow2" marker-end="url(#arrow-active)"/>
+
+            <!-- OrderRepository -->
+            <g id="m4NodeRepo">
+              <rect x="415" y="140" width="140" height="70" rx="8" fill="#131b2e" stroke="#a855f7" stroke-width="2"/>
+              <text x="485" y="170" text-anchor="middle" fill="#a855f7" font-weight="bold" font-size="11">OrderRepository</text>
+              <text x="485" y="190" text-anchor="middle" fill="#94a3b8" font-size="9">@Repository</text>
+            </g>
+
+            <!-- Container Overlay boundary for Spring mode -->
+            <rect id="m4ContainerBox" x="15" y="80" width="570" height="180" rx="12" fill="none" stroke="#6DB33F" stroke-width="2" stroke-dasharray="6,6"/>
+            <text id="m4ContainerLabel" x="300" y="105" text-anchor="middle" fill="#6DB33F" font-mono font-size="11" font-weight="bold">
+              SPRING APPLICATIONCONTEXT (BEAN FACTORY)
+            </text>
+          </svg>
+        </div>
+
+        <!-- Code & Concepts Card -->
+        <div class="lg:col-span-5 bg-dark-card border border-dark-border rounded-xl p-5 flex flex-col justify-between space-y-4 shadow-xl">
+          <div>
+            <h3 id="m4Title" class="text-lg font-bold text-white mb-2">
+              Spring Inversion of Control (IoC)
+            </h3>
+            <p id="m4Desc" class="text-xs text-slate-300 leading-relaxed mb-4">
+              Objects do not construct their dependencies. Instead, the Spring container inspects bean metadata, resolves required dependencies, and injects singletons into class constructors.
+            </p>
+
+            <div class="bg-dark-bg p-3.5 rounded-lg border border-dark-border space-y-2">
+              <div class="text-xs font-bold text-spring uppercase tracking-wider">DI Best Practice:</div>
+              <div class="text-xs text-slate-300 space-y-1">
+                <p>• <strong>Constructor Injection:</strong> Recommended. Ensures immutability (<code class="text-spring">final</code> fields) and ease of testing.</p>
+                <p>• <strong>Field Injection (<code class="text-rose-400">@Autowired</code> on private fields):</strong> Discouraged. Tightly couples code to Spring container and complicates testing.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-dark-bg p-3 rounded-lg border border-dark-border">
+            <div class="text-[11px] font-mono text-slate-400 mb-1" id="m4CodeHeader">SPRING CONSTRUCTOR INJECTION CODE:</div>
+            <pre id="m4Code" class="text-xs font-mono text-spring p-2 bg-black/40 rounded overflow-x-auto">
+@Service
+public class OrderService {
+    private final OrderRepository repository;
+
+    // Spring automatically injects OrderRepository bean
+    public OrderService(OrderRepository repository) {
+        this.repository = repository;
+    }
+}
+            </pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- MODULE 5: AUTO-CONFIG BACK-OFF SIMULATOR -->
+    <!-- ========================================== -->
+    <section id="module5" class="tab-content hidden space-y-6">
+      <div class="bg-dark-card border border-dark-border rounded-xl p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-xl">
+        <div>
+          <h2 class="text-xl font-bold text-white flex items-center gap-2">
+            <span class="text-spring"><i class="fa-solid fa-sliders"></i></span> 
+            Module 5: Auto-Configuration & @Conditional Back-off Simulator
+          </h2>
+          <p class="text-xs text-slate-400 mt-1">
+            Test how Spring Boot auto-configurations back off when user-defined beans exist.
+          </p>
+        </div>
+
+        <!-- Scenario Switcher -->
+        <div class="flex items-center gap-2 bg-dark-bg p-1.5 rounded-lg border border-dark-border">
+          <button onclick="m5SetScenario('default')" id="m5BtnDef" class="px-3 py-1.5 rounded text-xs font-mono bg-spring text-black font-bold transition">
+            Scenario A: Default Spring Boot Auto-Config
+          </button>
+          <button onclick="m5SetScenario('custom')" id="m5BtnCust" class="px-3 py-1.5 rounded text-xs font-mono border border-dark-border text-slate-300 transition">
+            Scenario B: User Custom @Bean DataSource Provided
+          </button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- SVG Condition Evaluator Flow -->
+        <div class="lg:col-span-7 bg-dark-card border border-dark-border rounded-xl p-5 flex flex-col items-center justify-center min-h-[400px]">
+          <svg viewBox="0 0 600 360" class="w-full h-auto">
+            <!-- Step 1: SPI Discovery -->
+            <rect x="30" y="30" width="540" height="45" rx="8" fill="#131b2e" stroke="#1f2d47" stroke-width="2"/>
+            <text x="300" y="57" text-anchor="middle" fill="#38bdf8" font-mono font-size="11">
+              Read imports SPI: META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports
+            </text>
+
+            <!-- Arrow Down -->
+            <path d="M 300 75 L 300 110" stroke="#1f2d47" stroke-width="2" marker-end="url(#arrow)"/>
+
+            <!-- Step 2: Conditional Evaluation -->
+            <rect x="150" y="110" width="300" height="60" rx="8" fill="#131b2e" stroke="#a855f7" stroke-width="2"/>
+            <text x="300" y="135" text-anchor="middle" fill="#a855f7" font-weight="bold" font-size="11">Evaluate @Conditional Annotations</text>
+            <text x="300" y="155" text-anchor="middle" fill="#94a3b8" font-size="9">@ConditionalOnClass, @ConditionalOnMissingBean</text>
+
+            <!-- Left Branch: Condition Met -->
+            <path d="M 230 170 L 150 230" stroke="#6DB33F" stroke-width="2" marker-end="url(#arrow-active)" id="m5LinePass"/>
+            <rect x="50" y="230" width="200" height="80" rx="8" fill="#131b2e" stroke="#6DB33F" stroke-width="2" id="m5BoxPass"/>
+            <text x="150" y="260" text-anchor="middle" fill="#6DB33F" font-weight="bold" font-size="12">DataSource Created</text>
+            <text x="150" y="282" text-anchor="middle" fill="#94a3b8" font-size="10" id="m5PassLabel">Default HikariCP Bean</text>
+
+            <!-- Right Branch: Condition Failed / Backed Off -->
+            <path d="M 370 170 L 450 230" stroke="#1f2d47" stroke-width="2" marker-end="url(#arrow)" id="m5LineBack"/>
+            <rect x="350" y="230" width="200" height="80" rx="8" fill="#131b2e" stroke="#1f2d47" stroke-width="2" id="m5BoxBack"/>
+            <text x="450" y="260" text-anchor="middle" fill="#f43f5e" font-weight="bold" font-size="12" id="m5BackTitle">Auto-Config Backs Off</text>
+            <text x="450" y="282" text-anchor="middle" fill="#94a3b8" font-size="10" id="m5BackSub">Condition Skipped</text>
+          </svg>
+        </div>
+
+        <!-- Explanation Card -->
+        <div class="lg:col-span-5 bg-dark-card border border-dark-border rounded-xl p-5 flex flex-col justify-between space-y-4 shadow-xl">
+          <div>
+            <span id="m5Badge" class="bg-spring/20 text-spring font-mono text-xs px-2.5 py-1 rounded-md border border-spring/40 font-bold uppercase">
+              Scenario A: Default Boot Auto-Configuration
+            </span>
+
+            <h3 id="m5Title" class="text-xl font-bold text-white mt-3 mb-2">
+              Default DataSource Auto-Config Active
+            </h3>
+
+            <p id="m5Desc" class="text-xs text-slate-300 leading-relaxed mb-4">
+              Spring Boot detects <code class="text-spring font-mono">HikariCP</code> on the classpath and confirms no user-defined <code class="text-spring font-mono">DataSource</code> bean exists in the ApplicationContext. Condition <code class="text-spring font-mono">@ConditionalOnMissingBean(DataSource.class)</code> evaluates to TRUE.
+            </p>
+
+            <div class="bg-dark-bg p-3.5 rounded-lg border border-dark-border space-y-2">
+              <div class="text-xs font-bold text-spring uppercase tracking-wider">Spring Boot 3.x SPI Migration Note:</div>
+              <p class="text-xs text-slate-300 leading-relaxed">
+                Prior to Boot 2.7/3.0, auto-configurations were loaded via <code class="text-slate-400 font-mono">META-INF/spring.factories</code>. Modern Spring Boot 3.x uses imports list files at <code class="text-spring font-mono">META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports</code>.
+              </p>
+            </div>
+          </div>
+
+          <div class="bg-dark-bg p-3 rounded-lg border border-dark-border">
+            <div class="text-[11px] font-mono text-slate-400 mb-1">EVALUATION METADATA:</div>
+            <pre id="m5Code" class="text-xs font-mono text-spring p-2 bg-black/40 rounded overflow-x-auto">
+@AutoConfiguration
+@ConditionalOnClass({ DataSource.class, EmbeddedDatabaseType.class })
+@ConditionalOnMissingBean(type = "javax.sql.DataSource")
+public class DataSourceAutoConfiguration { ... }
+            </pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- MODULE 6: HTTP REQUEST & SECURITY EXECUTION FLOW -->
+    <!-- ========================================== -->
+    <section id="module6" class="tab-content hidden space-y-6">
+      
+      <!-- Controls Bar & Scenario Dropdown -->
+      <div class="bg-dark-card border border-dark-border rounded-xl p-4 shadow-xl flex flex-wrap items-center justify-between gap-4">
+        <div class="flex items-center space-x-3 w-full lg:w-auto">
+          <label for="m6ScenarioSelect" class="text-xs font-semibold uppercase tracking-wider text-slate-400 whitespace-nowrap">Security Scenario:</label>
+          <select id="m6ScenarioSelect" onchange="m6ChangeScenario()" class="bg-dark-bg text-slate-200 border border-dark-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-spring w-full sm:w-80 font-mono">
+            <option value="jwt_success">1. GET /api/orders (JWT Auth Success - 200 OK)</option>
+            <option value="jwt_auth_fail">2. GET /api/orders (Invalid JWT - 401 Unauthorized)</option>
+            <option value="jwt_authz_fail">3. GET /api/admin/users (Forbidden Role - 403 Forbidden)</option>
+            <option value="form_login">4. POST /login (Username/Password Form Login Flow)</option>
+          </select>
+        </div>
+
+        <!-- Playback Controls -->
+        <div class="flex items-center space-x-2">
+          <button onclick="m6RestartAnimation()" title="Restart" class="bg-dark-bg hover:bg-dark-hover text-slate-300 p-2.5 rounded-lg border border-dark-border transition">
+            <i class="fa-solid fa-rotate-left"></i>
+          </button>
+          <button onclick="m6PrevStep()" title="Previous Step" class="bg-dark-bg hover:bg-dark-hover text-slate-300 p-2.5 rounded-lg border border-dark-border transition">
+            <i class="fa-solid fa-backward-step"></i>
+          </button>
+          <button id="m6PlayPauseBtn" onclick="m6TogglePlayPause()" title="Play" class="bg-spring text-black font-bold px-4 py-2.5 rounded-lg border border-spring transition flex items-center space-x-2 text-xs">
+            <i id="m6PlayIcon" class="fa-solid fa-play"></i>
+            <span id="m6PlayBtnText">Play Flow</span>
+          </button>
+          <button onclick="m6NextStep()" title="Next Step" class="bg-dark-bg hover:bg-dark-hover text-slate-300 p-2.5 rounded-lg border border-dark-border transition">
+            <i class="fa-solid fa-forward-step"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Step Status Banner -->
+      <div class="bg-dark-card border border-dark-border rounded-xl p-4 shadow-lg space-y-3">
+        <div class="flex justify-between items-center text-xs font-mono">
+          <span id="m6StepCounter" class="text-spring font-semibold">Step 1 of 17</span>
+          <span id="m6ScenarioTag" class="bg-dark-bg text-slate-300 px-2.5 py-0.5 rounded border border-dark-border">JWT Success Flow</span>
+        </div>
+        <div class="w-full bg-dark-bg rounded-full h-2 overflow-hidden border border-dark-border">
+          <div id="m6ProgressBar" class="bg-spring h-2 transition-all duration-300" style="width: 5%;"></div>
+        </div>
+        <div class="flex items-start space-x-3 pt-1">
+          <div id="m6StepStatusIcon" class="mt-0.5 text-spring text-lg">
+            <i class="fa-solid fa-circle-info"></i>
+          </div>
+          <div>
+            <h3 id="m6StepTitle" class="text-sm font-bold text-white">Browser Initiates Request</h3>
+            <p id="m6StepDescription" class="text-xs text-slate-300 mt-0.5 leading-relaxed">The client initiates an HTTP GET request to /api/orders containing a Bearer Authorization header.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main Diagram Area & Sidebar Inspector -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        
+        <!-- Architecture Diagram Canvas -->
+        <div class="lg:col-span-8 bg-dark-card border border-dark-border rounded-xl p-4 sm:p-6 shadow-2xl relative overflow-hidden">
+          
+          <div class="flex flex-wrap items-center gap-3 mb-6 pb-4 border-b border-dark-border/80 text-[11px] font-medium">
+            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-layer-client"></span> Client</span>
+            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-layer-container"></span> Tomcat Container</span>
+            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-layer-security"></span> Spring Security</span>
+            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-layer-mvc"></span> Spring MVC</span>
+            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-layer-app"></span> Application Layer</span>
+            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-layer-db"></span> Database</span>
+          </div>
+
+          <div class="relative space-y-4 font-mono text-xs" id="m6DiagramContainer">
+            
+            <!-- Dynamic Request Packet Indicator -->
+            <div id="m6RequestPacket" class="absolute z-30 hidden w-6 h-6 rounded-full bg-spring text-slate-950 flex items-center justify-center font-bold shadow-lg text-[10px] pointer-events-none">
+              <i class="fa-solid fa-paper-plane"></i>
+            </div>
+
+            <!-- 1. Client -->
+            <div id="node-client" onclick="selectComponent('client')" class="arch-node cursor-pointer bg-dark-bg border-2 border-layer-client/50 hover:border-layer-client rounded-lg p-3 text-slate-200 flex items-center justify-between group shadow-md">
+              <div class="flex items-center space-x-3">
+                <div class="bg-layer-client/20 text-layer-client p-2 rounded"><i class="fa-solid fa-globe text-base"></i></div>
+                <div>
+                  <h4 class="font-bold text-white group-hover:text-layer-client transition">Client / Browser</h4>
+                  <p class="text-[10px] text-slate-400">Sends HTTP Request with Headers / Auth Tokens</p>
+                </div>
+              </div>
+              <span class="text-[10px] bg-dark-card border border-dark-border text-slate-400 px-2 py-1 rounded">External</span>
+            </div>
+
+            <div class="flex justify-center my-1"><i class="fa-solid fa-arrow-down text-slate-600"></i></div>
+
+            <!-- 2. Servlet Container (Tomcat) -->
+            <div id="node-tomcat" onclick="selectComponent('tomcat')" class="arch-node cursor-pointer bg-dark-bg border-2 border-layer-container/50 hover:border-layer-container rounded-lg p-3 text-slate-200 flex items-center justify-between group shadow-md">
+              <div class="flex items-center space-x-3">
+                <div class="bg-layer-container/20 text-layer-container p-2 rounded"><i class="fa-solid fa-server text-base"></i></div>
+                <div>
+                  <h4 class="font-bold text-white group-hover:text-layer-container transition">Servlet Container (Tomcat)</h4>
+                  <p class="text-[10px] text-slate-400">Creates HttpServletRequest / Response & Invokes Filter Chain</p>
+                </div>
+              </div>
+              <span class="text-[10px] bg-dark-card border border-dark-border text-slate-400 px-2 py-1 rounded">Container</span>
+            </div>
+
+            <div class="flex justify-center my-1"><i class="fa-solid fa-arrow-down text-slate-600"></i></div>
+
+            <!-- 3. Servlet Filter Chain -->
+            <div id="node-servlet-filters" onclick="selectComponent('servlet-filters')" class="arch-node cursor-pointer bg-dark-bg border-2 border-layer-container/50 hover:border-layer-container rounded-lg p-3 text-slate-200 flex items-center justify-between group shadow-md">
+              <div class="flex items-center space-x-3">
+                <div class="bg-layer-container/20 text-layer-container p-2 rounded"><i class="fa-solid fa-filter text-base"></i></div>
+                <div>
+                  <h4 class="font-bold text-white group-hover:text-layer-container transition">Servlet Filter Chain</h4>
+                  <p class="text-[10px] text-slate-400">Standard JavaEE/Jakarta Filters (CorsFilter, CharacterEncodingFilter)</p>
+                </div>
+              </div>
+              <span class="text-[10px] bg-dark-card border border-dark-border text-slate-400 px-2 py-1 rounded">jakarta.servlet</span>
+            </div>
+
+            <div class="flex justify-center my-1"><i class="fa-solid fa-arrow-down text-slate-600"></i></div>
+
+            <!-- 4. DelegatingFilterProxy -->
+            <div id="node-delegating-proxy" onclick="selectComponent('delegating-proxy')" class="arch-node cursor-pointer bg-dark-bg border-2 border-layer-security/50 hover:border-layer-security rounded-lg p-3 text-slate-200 flex items-center justify-between group shadow-md">
+              <div class="flex items-center space-x-3">
+                <div class="bg-layer-security/20 text-layer-security p-2 rounded"><i class="fa-solid fa-bridge text-base"></i></div>
+                <div>
+                  <h4 class="font-bold text-white group-hover:text-layer-security transition">DelegatingFilterProxy</h4>
+                  <p class="text-[10px] text-slate-400">Servlet Filter bridge that delegates to Spring-managed Bean</p>
+                </div>
+              </div>
+              <span class="text-[10px] bg-spring/10 border border-spring/30 text-spring px-2 py-1 rounded">Bridge</span>
+            </div>
+
+            <div class="flex justify-center my-1"><i class="fa-solid fa-arrow-down text-slate-600"></i></div>
+
+            <!-- 5. FilterChainProxy -->
+            <div id="node-filter-chain-proxy" onclick="selectComponent('filter-chain-proxy')" class="arch-node cursor-pointer bg-dark-bg border-2 border-layer-security/50 hover:border-layer-security rounded-lg p-3 text-slate-200 flex items-center justify-between group shadow-md">
+              <div class="flex items-center space-x-3">
+                <div class="bg-layer-security/20 text-layer-security p-2 rounded"><i class="fa-solid fa-sitemap text-base"></i></div>
+                <div>
+                  <h4 class="font-bold text-white group-hover:text-layer-security transition">FilterChainProxy (springSecurityFilterChain)</h4>
+                  <p class="text-[10px] text-slate-400">Spring Security entry point. Selects matching SecurityFilterChain</p>
+                </div>
+              </div>
+              <span class="text-[10px] bg-layer-security/20 text-layer-security border border-layer-security/40 px-2 py-1 rounded">Bean</span>
+            </div>
+
+            <div class="flex justify-center my-1"><i class="fa-solid fa-arrow-down text-slate-600"></i></div>
+
+            <!-- 6. SecurityFilterChain Container -->
+            <div id="node-security-chain" class="bg-dark-bg border-2 border-layer-security rounded-xl p-4 space-y-3 shadow-lg">
+              <div onclick="selectComponent('security-filter-chain')" class="flex items-center justify-between cursor-pointer border-b border-dark-border pb-2">
+                <div class="flex items-center space-x-2">
+                  <i class="fa-solid fa-shield text-layer-security"></i>
+                  <h4 class="font-bold text-white hover:text-layer-security transition">Selected SecurityFilterChain</h4>
+                </div>
+                <span class="text-[10px] bg-dark-card border border-dark-border text-slate-400 px-2 py-0.5 rounded">Security Context</span>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div id="node-jwt-filter" onclick="selectComponent('jwt-filter')" class="arch-node cursor-pointer bg-dark-card border border-dark-border hover:border-layer-security p-2.5 rounded text-center">
+                  <div class="text-xs font-bold text-slate-200">JWT Auth Filter</div>
+                  <p class="text-[9px] text-slate-400 mt-0.5">Validates Bearer Token</p>
+                </div>
+                <div id="node-form-filter" onclick="selectComponent('form-filter')" class="arch-node cursor-pointer bg-dark-card border border-dark-border hover:border-layer-security p-2.5 rounded text-center">
+                  <div class="text-xs font-bold text-slate-200">UsernamePassword Filter</div>
+                  <p class="text-[9px] text-slate-400 mt-0.5">Form POST /login</p>
+                </div>
+                <div id="node-authz-filter" onclick="selectComponent('authz-filter')" class="arch-node cursor-pointer bg-dark-card border border-dark-border hover:border-layer-security p-2.5 rounded text-center">
+                  <div class="text-xs font-bold text-slate-200">AuthorizationFilter</div>
+                  <p class="text-[9px] text-slate-400 mt-0.5">Checks Role/Authority</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="flex justify-center my-1"><i class="fa-solid fa-arrow-down text-slate-600"></i></div>
+
+            <!-- 7. DispatcherServlet -->
+            <div id="node-dispatcher-servlet" onclick="selectComponent('dispatcher-servlet')" class="arch-node cursor-pointer bg-dark-bg border-2 border-layer-mvc/50 hover:border-layer-mvc rounded-lg p-3 text-slate-200 flex items-center justify-between group shadow-md">
+              <div class="flex items-center space-x-3">
+                <div class="bg-layer-mvc/20 text-layer-mvc p-2 rounded"><i class="fa-solid fa-route text-base"></i></div>
+                <div>
+                  <h4 class="font-bold text-white group-hover:text-layer-mvc transition">DispatcherServlet</h4>
+                  <p class="text-[10px] text-slate-400">Spring MVC Front Controller. Resolves Handlers & Interceptors</p>
+                </div>
+              </div>
+              <span class="text-[10px] bg-dark-card border border-dark-border text-slate-400 px-2 py-1 rounded">Spring MVC</span>
+            </div>
+
+            <div class="flex justify-center my-1"><i class="fa-solid fa-arrow-down text-slate-600"></i></div>
+
+            <!-- 8. HandlerInterceptor -->
+            <div id="node-interceptor" onclick="selectComponent('interceptor')" class="arch-node cursor-pointer bg-dark-bg border-2 border-layer-mvc/50 hover:border-layer-mvc rounded-lg p-3 text-slate-200 flex items-center justify-between group shadow-md">
+              <div class="flex items-center space-x-3">
+                <div class="bg-layer-mvc/20 text-layer-mvc p-2 rounded"><i class="fa-solid fa-list-check text-base"></i></div>
+                <div>
+                  <h4 class="font-bold text-white group-hover:text-layer-mvc transition">Spring MVC Interceptor (HandlerInterceptor)</h4>
+                  <p class="text-[10px] text-slate-400">preHandle() / postHandle() execution around Handler</p>
+                </div>
+              </div>
+              <span class="text-[10px] bg-dark-card border border-dark-border text-slate-400 px-2 py-1 rounded">MVC Interceptor</span>
+            </div>
+
+            <div class="flex justify-center my-1"><i class="fa-solid fa-arrow-down text-slate-600"></i></div>
+
+            <!-- 9. Application Layers -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <div id="node-controller" onclick="selectComponent('controller')" class="arch-node cursor-pointer bg-dark-bg border-2 border-layer-app/50 hover:border-layer-app p-3 rounded-lg text-center shadow-md">
+                <div class="bg-layer-app/20 text-layer-app p-1.5 rounded w-fit mx-auto mb-1"><i class="fa-solid fa-code"></i></div>
+                <h5 class="font-bold text-white text-xs">Controller</h5>
+                <p class="text-[9px] text-slate-400">@RestController</p>
+              </div>
+
+              <div id="node-service" onclick="selectComponent('service')" class="arch-node cursor-pointer bg-dark-bg border-2 border-layer-app/50 hover:border-layer-app p-3 rounded-lg text-center shadow-md">
+                <div class="bg-layer-app/20 text-layer-app p-1.5 rounded w-fit mx-auto mb-1"><i class="fa-solid fa-gear"></i></div>
+                <h5 class="font-bold text-white text-xs">Service</h5>
+                <p class="text-[9px] text-slate-400">@Service Business</p>
+              </div>
+
+              <div id="node-repository" onclick="selectComponent('repository')" class="arch-node cursor-pointer bg-dark-bg border-2 border-layer-app/50 hover:border-layer-app p-3 rounded-lg text-center shadow-md">
+                <div class="bg-layer-app/20 text-layer-app p-1.5 rounded w-fit mx-auto mb-1"><i class="fa-solid fa-box-archive"></i></div>
+                <h5 class="font-bold text-white text-xs">Repository</h5>
+                <p class="text-[9px] text-slate-400">@Repository / JPA</p>
+              </div>
+            </div>
+
+            <div class="flex justify-center my-1"><i class="fa-solid fa-arrow-down text-slate-600"></i></div>
+
+            <!-- 10. Database -->
+            <div id="node-database" onclick="selectComponent('database')" class="arch-node cursor-pointer bg-dark-bg border-2 border-layer-db/50 hover:border-layer-db rounded-lg p-3 text-slate-200 flex items-center justify-between group shadow-md">
+              <div class="flex items-center space-x-3">
+                <div class="bg-layer-db/20 text-layer-db p-2 rounded"><i class="fa-solid fa-database text-base"></i></div>
+                <div>
+                  <h4 class="font-bold text-white group-hover:text-layer-db transition">Database (PostgreSQL / MySQL)</h4>
+                  <p class="text-[10px] text-slate-400">Stores persistent user, order, and domain data</p>
+                </div>
+              </div>
+              <span class="text-[10px] bg-dark-card border border-dark-border text-slate-400 px-2 py-1 rounded">Data Storage</span>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Sidebar Inspector -->
+        <div class="lg:col-span-4 bg-dark-card border border-dark-border rounded-xl p-5 shadow-xl space-y-4 sticky top-20">
+          <div class="flex items-center justify-between border-b border-dark-border pb-3">
+            <div class="flex items-center space-x-2 text-spring font-bold text-sm uppercase tracking-wider">
+              <i class="fa-solid fa-microscope"></i>
+              <span>Component Inspector</span>
+            </div>
+            <span class="text-[10px] text-slate-500">Click node to inspect</span>
+          </div>
+
+          <div id="inspectorContent" class="space-y-4 text-xs">
+            <div class="text-center py-10 text-slate-500">
+              <i class="fa-solid fa-hand-pointer text-3xl mb-2 block text-slate-600"></i>
+              <p>Click on any architecture box above to view technical breakdown, Spring class names, interview explanations, and real-world usage.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- MODULE 7: SECURITY MATRIX & MULTI-CHAIN ROUTER -->
+    <!-- ========================================== -->
+    <section id="module7" class="tab-content hidden space-y-6">
+      <div class="bg-dark-card border border-dark-border rounded-xl p-6 shadow-xl space-y-6">
+        <div>
+          <h2 class="text-lg font-bold text-white flex items-center gap-2">
+            <span class="text-spring"><i class="fa-solid fa-table-columns"></i></span>
+            Architectural Comparison Matrix & Multi-SecurityFilterChain Router
+          </h2>
+          <p class="text-xs text-slate-400 mt-1">Detailed comparison between Servlet Filters, Spring Security Filters, and Spring MVC Interceptors.</p>
+        </div>
+
+        <!-- Comparison Table -->
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr class="bg-dark-bg border-b border-dark-border text-slate-300 font-mono">
+                <th class="p-3 border-r border-dark-border">Feature</th>
+                <th class="p-3 border-r border-dark-border text-layer-container">Servlet Filter</th>
+                <th class="p-3 border-r border-dark-border text-layer-security">Spring Security Filter</th>
+                <th class="p-3 text-layer-mvc">Spring MVC Interceptor</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-dark-border text-slate-300">
+              <tr class="hover:bg-dark-hover">
+                <td class="p-3 font-semibold text-slate-400 border-r border-dark-border">Belongs To</td>
+                <td class="p-3 border-r border-dark-border">Servlet Container (Tomcat)</td>
+                <td class="p-3 border-r border-dark-border">Spring ApplicationContext (Beans)</td>
+                <td class="p-3">Spring MVC Framework</td>
+              </tr>
+              <tr class="hover:bg-dark-hover">
+                <td class="p-3 font-semibold text-slate-400 border-r border-dark-border">Execution Location</td>
+                <td class="p-3 border-r border-dark-border">Outside Spring, before DispatcherServlet</td>
+                <td class="p-3 border-r border-dark-border">Inside DelegatingFilterProxy</td>
+                <td class="p-3">Inside DispatcherServlet processing</td>
+              </tr>
+              <tr class="hover:bg-dark-hover">
+                <td class="p-3 font-semibold text-slate-400 border-r border-dark-border">Spring Controller Access</td>
+                <td class="p-3 border-r border-dark-border text-red-400">No</td>
+                <td class="p-3 border-r border-dark-border text-red-400">No</td>
+                <td class="p-3 text-emerald-400">Yes (Object handler reflection)</td>
+              </tr>
+              <tr class="hover:bg-dark-hover">
+                <td class="p-3 font-semibold text-slate-400 border-r border-dark-border">Primary Use Cases</td>
+                <td class="p-3 border-r border-dark-border">GZIP, CORS, Low-level Logging</td>
+                <td class="p-3 border-r border-dark-border">AuthN, AuthZ, CSRF, Token Parsing</td>
+                <td class="p-3">Controller timing, Theme resolution</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Multi-Chain Routing Visualizer -->
+        <div class="pt-6 border-t border-dark-border">
+          <h3 class="text-base font-bold text-white mb-3">FilterChainProxy Multiple SecurityFilterChain Matching</h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Chain 1 -->
+            <div class="bg-dark-bg border-2 border-spring/40 rounded-xl p-4 space-y-3 relative">
+              <div class="flex justify-between items-center border-b border-dark-border pb-2">
+                <span class="text-xs font-bold text-spring font-mono">Order(1) - API Chain</span>
+                <span class="text-[10px] bg-spring/10 text-spring border border-spring/30 px-2 py-0.5 rounded">URL: /api/**</span>
+              </div>
+              <div class="text-xs text-slate-300 font-mono space-y-1">
+                <p><span class="text-purple-400">@Bean</span> <span class="text-blue-400">@Order</span>(1)</p>
+                <p><span class="text-blue-400">public</span> SecurityFilterChain apiChain(HttpSecurity http) {</p>
+                <p class="pl-4">http.securityMatcher(<span class="text-emerald-300">"/api/**"</span>).addFilterBefore(jwtFilter, ...);</p>
+                <p>}</p>
+              </div>
+            </div>
+
+            <!-- Chain 2 -->
+            <div class="bg-dark-bg border-2 border-amber-500/40 rounded-xl p-4 space-y-3 relative">
+              <div class="flex justify-between items-center border-b border-dark-border pb-2">
+                <span class="text-xs font-bold text-amber-400 font-mono">Order(2) - Form Chain</span>
+                <span class="text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded">URL: /admin/**</span>
+              </div>
+              <div class="text-xs text-slate-300 font-mono space-y-1">
+                <p><span class="text-purple-400">@Bean</span> <span class="text-blue-400">@Order</span>(2)</p>
+                <p><span class="text-blue-400">public</span> SecurityFilterChain adminChain(HttpSecurity http) {</p>
+                <p class="pl-4">http.securityMatcher(<span class="text-emerald-300">"/admin/**"</span>).formLogin(Customizer.withDefaults());</p>
+                <p>}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- MODULE 8: 20+ ARCHITECT INTERVIEW Q&A -->
+    <!-- ========================================== -->
+    <section id="module8" class="tab-content hidden space-y-6">
+      <div class="bg-dark-card border border-dark-border rounded-xl p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-xl">
+        <div>
+          <h2 class="text-xl font-bold text-white flex items-center gap-2">
+            <span class="text-spring"><i class="fa-solid fa-user-ninja"></i></span> 
+            Module 8: Senior Java Architect Interview Knowledgebase (20 Questions)
+          </h2>
+          <p class="text-xs text-slate-400 mt-1">
+            Curated high-frequency architectural interview questions with deep technical explanations.
+          </p>
+        </div>
+
+        <input type="text" id="qaSearchInput" onkeyup="filterQA()" placeholder="Search questions (e.g. Auto-config, BeanFactory)..." class="bg-dark-bg border border-dark-border text-xs text-slate-200 px-3 py-2 rounded-lg w-full md:w-72 focus:outline-none focus:border-spring">
+      </div>
+
+      <div class="space-y-3" id="qaList">
+        <!-- Dynamically generated via JS -->
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- MODULE 9: INTERACTIVE QUIZ EVALUATOR -->
+    <!-- ========================================== -->
+    <section id="module9" class="tab-content hidden space-y-6">
+      <div class="bg-dark-card border border-dark-border rounded-xl p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-xl">
+        <div>
+          <h2 class="text-xl font-bold text-white flex items-center gap-2">
+            <span class="text-spring"><i class="fa-solid fa-vial"></i></span> 
+            Module 9: Interactive Architectural Knowledge Test
+          </h2>
+          <p class="text-xs text-slate-400 mt-1">
+            Validate your mastery of Spring Boot internals with scenario-based architect level questions.
+          </p>
+        </div>
+
+        <div class="bg-dark-bg border border-dark-border px-4 py-2 rounded-lg text-xs font-mono text-slate-300">
+          Score: <span id="quizScore" class="text-spring font-bold">0</span> / <span id="quizTotal">5</span>
+        </div>
+      </div>
+
+      <div class="bg-dark-card border border-dark-border rounded-xl p-6 space-y-6 shadow-xl" id="quizContainer">
+        <!-- Dynamically populated -->
+      </div>
+    </section>
+
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="border-t border-dark-border py-4 text-center text-xs text-slate-500 bg-dark-card/40 mt-12">
+    <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-center gap-2">
+      <div>Spring Boot Internal Architecture & Request Execution Visual Simulator</div>
+      <div class="font-mono text-slate-400">Spring Boot 3.x Spec</div>
+    </div>
+  </footer>
+
+  <!-- JAVASCRIPT APPLICATION LOGIC & AUDIO NARRATOR -->
+  <script>
+    // Global Audio Narrator Toggle State
+    let isAudioEnabled = false;
+    let animationSpeed = 1.0;
+    const synth = window.speechSynthesis;
+
+    function speakText(text) {
+      if (!isAudioEnabled || !synth) return;
+      synth.cancel();
+
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 1.0 * animationSpeed;
+      utterance.pitch = 1.0;
+      synth.speak(utterance);
+    }
+
+    function toggleAudio() {
+      isAudioEnabled = !isAudioEnabled;
+      const m1Text = document.getElementById('m1AudioText');
+      const m1Icon = document.getElementById('m1AudioIcon');
+      const m1Btn = document.getElementById('m1AudioBtn');
+
+      const gText = document.getElementById('globalAudioText');
+      const gIcon = document.getElementById('globalAudioIcon');
+
+      if (isAudioEnabled) {
+        if (m1Text) m1Text.innerText = 'Voice ON';
+        if (m1Icon) m1Icon.className = 'fa-solid fa-volume-high text-spring';
+        if (m1Btn) m1Btn.className = 'px-3 py-1.5 rounded border border-spring/40 bg-spring/20 text-spring font-bold transition flex items-center gap-1.5 text-xs';
+        
+        if (gText) gText.innerText = 'Voice ON';
+        if (gIcon) gIcon.className = 'fa-solid fa-volume-high text-spring';
+
+        // Speak active step immediately
+        const activeTab = document.querySelector('.tab-btn.active')?.getAttribute('data-tab');
+        if (activeTab === 'module1') {
+          const data = m1StepsData[m1CurrentStep - 1];
+          speakText(`${data.title}. ${data.desc}`);
+        } else if (activeTab === 'module6') {
+          const currentStep = scenarios[currentScenario].steps[currentStepIndex];
+          speakText(`${currentStep.title}. ${currentStep.desc}`);
+        }
+      } else {
+        if (m1Text) m1Text.innerText = 'Voice OFF';
+        if (m1Icon) m1Icon.className = 'fa-solid fa-volume-xmark text-slate-400';
+        if (m1Btn) m1Btn.className = 'px-3 py-1.5 rounded border border-dark-border bg-dark-card hover:bg-dark-hover text-slate-300 transition flex items-center gap-1.5 text-xs';
+
+        if (gText) gText.innerText = 'Voice OFF';
+        if (gIcon) gIcon.className = 'fa-solid fa-volume-xmark text-slate-400';
+
+        if (synth) synth.cancel();
+      }
+    }
+
+    function setSpeed(speed) {
+      animationSpeed = speed;
+      [0.5, 1, 2].forEach(s => {
+        const btn = document.getElementById(`speed-${s}`);
+        if (btn) {
+          if (s === speed) {
+            btn.className = 'speed-btn px-1.5 py-0.5 rounded border border-spring text-spring font-bold';
+          } else {
+            btn.className = 'speed-btn px-1.5 py-0.5 rounded border border-dark-border text-slate-400';
+          }
+        }
+      });
+    }
+
+    // UI Tab Switcher
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+      });
+
+      const targetContent = document.getElementById(tabId);
+      if (targetContent) targetContent.classList.remove('hidden');
+
+      const activeBtn = document.querySelector(`.tab-btn[data-tab="${tabId}"]`);
+      if (activeBtn) activeBtn.classList.add('active');
+
+      if (tabId !== 'module1' && m1IsPlaying) m1TogglePlay();
+      if (tabId !== 'module6' && isPlaying) m6PauseAnimation();
+    }
+
+    document.getElementById('mobileNavToggle')?.addEventListener('click', () => {
+      const navTabs = document.getElementById('navTabs');
+      navTabs.classList.toggle('hidden');
+      navTabs.classList.toggle('flex');
+    });
+
+    /* ==========================================================================
+       MODULE 1 DATA & ENGINE
+       ========================================================================== */
+    const m1StepsData = [
+      {
+        step: 1,
+        title: "JVM Initialization & main() Execution",
+        classRef: "java.lang.System / MyApplication",
+        desc: "The JVM loads the entrypoint class and launches main(). The bootstrap classloader loads core JDK classes, followed by Application ClassLoader preparing Spring Application binaries.",
+        components: ["JVM ClassLoader", "MyApplication.main()", "Bootstrap ClassLoader"],
+        architectNotes: "Execution begins in user space before handing over to SpringApplication static helper. Arguments passed to main(String[] args) are encapsulated into ApplicationArguments.",
+        code: `public static void main(String[] args) {\n    SpringApplication.run(MyApplication.class, args);\n}`
+      },
+      {
+        step: 2,
+        title: "SpringApplication Instance Preparation & Web Type Deduction",
+        classRef: "org.springframework.boot.SpringApplication",
+        desc: "SpringApplication deduces the web application type (SERVLET, REACTIVE, or NONE) by reflecting classpath presence of DispatcherServlet / WebFlux.",
+        components: ["SpringApplication", "WebApplicationType", "BootstrapRegistryInitializer"],
+        architectNotes: "If DispatcherServlet is present, WebApplicationType.SERVLET is chosen. This dictates which ApplicationContext class is instantiated in Step 3.",
+        code: `this.webApplicationType = WebApplicationType.deduceFromClasspath();`
+      },
+      {
+        step: 3,
+        title: "ApplicationContext Creation",
+        classRef: "AnnotationConfigServletWebServerApplicationContext",
+        desc: "Instantiates the IoC Container. For web apps, AnnotationConfigServletWebServerApplicationContext is created, initializing low-level BeanFactory (DefaultListableBeanFactory).",
+        components: ["ApplicationContext", "DefaultListableBeanFactory", "AnnotatedBeanDefinitionReader"],
+        architectNotes: "BeanFactory provides root bean lookup. ApplicationContext extends BeanFactory by adding Event Publishing, i18n MessageSource, and Environment integration.",
+        code: `protected ConfigurableApplicationContext createApplicationContext() {\n    return this.applicationContextFactory.create(this.webApplicationType);\n}`
+      },
+      {
+        step: 4,
+        title: "Environment Preparation & Property Hierarchies",
+        classRef: "org.springframework.core.env.ConfigurableEnvironment",
+        desc: "Prepares system properties, environment variables, application.yml / properties, and active profiles into a unified Environment abstraction.",
+        components: ["StandardServletEnvironment", "MutablePropertySources", "PropertySource"],
+        architectNotes: "Precedence Order: Command-line args -> System Properties -> OS Env Vars -> Profile application-{profile}.yml -> Default application.yml.",
+        code: `ConfigurableEnvironment environment = prepareEnvironment(listeners, bootstrapContext, applicationArguments);`
+      },
+      {
+        step: 5,
+        title: "Configuration Class Processing",
+        classRef: "ConfigurationClassPostProcessor",
+        desc: "BeanFactoryPostProcessors run before bean creation. ConfigurationClassPostProcessor parses @Configuration classes and evaluates @PropertySource & @Import directives.",
+        components: ["BeanFactoryPostProcessor", "ConfigurationClassPostProcessor", "ConfigurationClassParser"],
+        architectNotes: "This step reads metadata without instantiating business beans yet. It constructs a dependency graph of configuration definitions.",
+        code: `PostProcessorRegistrationDelegate.invokeBeanFactoryPostProcessors(beanFactory, getBeanFactoryPostProcessors());`
+      },
+      {
+        step: 6,
+        title: "Component Scanning Execution",
+        classRef: "ClassPathBeanDefinitionScanner",
+        desc: "Scans base packages starting from the package containing @SpringBootApplication to discover classes with @Component, @Service, @Repository, @Controller annotations.",
+        components: ["ClassPathBeanDefinitionScanner", "@ComponentScan", "ASM Bytecode Reader"],
+        architectNotes: "Scanning uses ASM bytecode inspection without loading classes into JVM memory eagerly, ensuring fast initialization during definition phase.",
+        code: `Set<BeanDefinition> candidates = this.scanner.doScan(basePackages);`
+      },
+      {
+        step: 7,
+        title: "BeanDefinition Registration",
+        classRef: "BeanDefinitionRegistry",
+        desc: "Discovered classes are wrapped into BeanDefinition metadata objects (specifying scope, lazy init status, autowire candidates) and registered in BeanDefinitionRegistry map.",
+        components: ["BeanDefinition", "BeanDefinitionRegistry", "RootBeanDefinition"],
+        architectNotes: "A BeanDefinition is NOT a bean object. It is a blueprint recipe containing class names, factory methods, constructor arguments, and initialization hooks.",
+        code: `beanFactory.registerBeanDefinition("orderService", beanDefinition);`
+      },
+      {
+        step: 8,
+        title: "Auto-Configuration Candidate Discovery & Evaluation",
+        classRef: "AutoConfigurationImportSelector",
+        desc: "Spring Boot loads candidate auto-configuration classes from META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports and evaluates @Conditional annotations.",
+        components: ["AutoConfigurationImportSelector", "@ConditionalOnClass", "@ConditionalOnMissingBean"],
+        architectNotes: "In Spring Boot 3.x, candidate auto-configurations are declared in the .imports file. Conditions evaluate whether candidates register or back off.",
+        code: `List<String> configurations = ImportCandidates.load(AutoConfiguration.class, getBeanClassLoader()).getCandidates();`
+      },
+      {
+        step: 9,
+        title: "Bean Instantiation & Dependency Injection",
+        classRef: "DefaultListableBeanFactory",
+        desc: "Iterates through non-lazy singleton BeanDefinitions, instantiates objects via constructor reflection, and injects required dependencies (@Autowired).",
+        components: ["DefaultListableBeanFactory", "AutowiredAnnotationBeanPostProcessor", "CglibSubclassingInstantiationStrategy"],
+        architectNotes: "Spring resolves dependency graphs. OrderRepository is created first, then injected into OrderService constructor, which is in turn injected into OrderController.",
+        code: `finishBeanFactoryInitialization(beanFactory);`
+      },
+      {
+        step: 10,
+        title: "Bean Lifecycle Initialization & Post-Processors",
+        classRef: "BeanPostProcessor",
+        desc: "Executes BeanPostProcessors (postProcessBeforeInitialization -> @PostConstruct -> InitializingBean.afterPropertiesSet -> postProcessAfterInitialization).",
+        components: ["BeanPostProcessor", "@PostConstruct", "InitializingBean", "AOP ProxyCreator"],
+        architectNotes: "AOP proxies (@Transactional, @Async) are created in postProcessAfterInitialization by wrapping the original instance into a CGLIB dynamic proxy.",
+        code: `Object wrappedBean = applyBeanPostProcessorsAfterInitialization(existingBean, beanName);`
+      },
+      {
+        step: 11,
+        title: "Embedded Web Server Startup",
+        classRef: "TomcatWebServer",
+        desc: "The ServletWebServerApplicationContext starts embedded Tomcat on configured port (8080), binds HTTP connectors, and registers DispatcherServlet.",
+        components: ["TomcatWebServer", "Tomcat", "Connector", "DispatcherServlet"],
+        architectNotes: "Unlike legacy WAR deployments where Tomcat manages Spring, in Spring Boot Spring Context manages Tomcat as an embedded bean lifecycle.",
+        code: `this.webServer = factory.getWebServer(getSelfInitializer());\nthis.webServer.start();`
+      },
+      {
+        step: 12,
+        title: "Application Ready Events & Runners Execution",
+        classRef: "DefaultApplicationArguments",
+        desc: "Spring Boot publishes ApplicationReadyEvent and invokes all registered CommandLineRunner and ApplicationRunner beans.",
+        components: ["ApplicationReadyEvent", "CommandLineRunner", "ApplicationRunner"],
+        architectNotes: "At this point, the application is fully initialized, healthy, and capable of serving HTTP traffic through embedded Tomcat connectors.",
+        code: `listeners.ready(context, timeTaken);\ncallRunners(context, applicationArguments);`
+      }
+    ];
+
+    let m1CurrentStep = 1;
+    let m1IsPlaying = false;
+    let m1Timer = null;
+
+    function m1RenderStep(stepNum) {
+      m1CurrentStep = stepNum;
+      const data = m1StepsData[stepNum - 1];
+
+      document.getElementById('m1StepCounter').innerText = `Step ${data.step} of 12`;
+      document.getElementById('m1ProgressBar').style.width = `${(data.step / 12) * 100}%`;
+
+      document.getElementById('m1StepBadge').innerText = `STEP ${data.step} OF 12`;
+      document.getElementById('m1StepClass').innerText = data.classRef;
+      document.getElementById('m1StepTitle').innerText = data.title;
+      document.getElementById('m1StepDesc').innerText = data.desc;
+      document.getElementById('m1ArchitectNotes').innerText = data.architectNotes;
+      document.getElementById('m1CodeSnippet').innerText = data.code;
+
+      const compsContainer = document.getElementById('m1Components');
+      compsContainer.innerHTML = '';
+      data.components.forEach(comp => {
+        const span = document.createElement('span');
+        span.className = 'text-[11px] font-mono bg-dark-bg text-spring border border-dark-border px-2 py-0.5 rounded';
+        span.innerText = comp;
+        compsContainer.appendChild(span);
+      });
+
+      for (let i = 1; i <= 12; i++) {
+        const node = document.getElementById(`m1Node${i}`);
+        if (!node) continue;
+        const rect = node.querySelector('rect');
+        if (i === stepNum) {
+          rect.setAttribute('stroke', '#6DB33F');
+          rect.setAttribute('stroke-width', '3');
+          rect.setAttribute('fill', '#1a2640');
+        } else if (i < stepNum) {
+          rect.setAttribute('stroke', '#38bdf8');
+          rect.setAttribute('stroke-width', '1.5');
+          rect.setAttribute('fill', '#131b2e');
+        } else {
+          rect.setAttribute('stroke', '#1f2d47');
+          rect.setAttribute('stroke-width', '2');
+          rect.setAttribute('fill', '#131b2e');
+        }
+      }
+
+      for (let i = 1; i <= 11; i++) {
+        const line = document.getElementById(`m1Line${i}`);
+        if (!line) continue;
+        if (i < stepNum) {
+          line.setAttribute('stroke', '#6DB33F');
+          line.setAttribute('marker-end', 'url(#arrow-active)');
+        } else {
+          line.setAttribute('stroke', '#1f2d47');
+          line.setAttribute('marker-end', 'url(#arrow)');
+        }
+      }
+
+      speakText(`${data.title}. ${data.desc}`);
+    }
+
+    function m1SelectStep(stepNum) {
+      if (m1IsPlaying) m1TogglePlay();
+      m1RenderStep(stepNum);
+    }
+
+    function m1NextStep() {
+      if (m1CurrentStep < 12) {
+        m1RenderStep(m1CurrentStep + 1);
+      } else if (m1IsPlaying) {
+        m1TogglePlay();
+      }
+    }
+
+    function m1PrevStep() {
+      if (m1CurrentStep > 1) {
+        m1RenderStep(m1CurrentStep - 1);
+      }
+    }
+
+    function m1TogglePlay() {
+      m1IsPlaying = !m1IsPlaying;
+      const playBtnText = document.getElementById('m1PlayText');
+      const playIcon = document.getElementById('m1PlayIcon');
+
+      if (m1IsPlaying) {
+        playBtnText.innerText = 'Pause';
+        playIcon.className = 'fa-solid fa-pause';
+        if (m1CurrentStep >= 12) m1RenderStep(1);
+        m1Timer = setInterval(() => {
+          if (m1CurrentStep < 12) {
+            m1NextStep();
+          } else {
+            m1TogglePlay();
+          }
+        }, 2500 / animationSpeed);
+      } else {
+        playBtnText.innerText = 'Play Animation';
+        playIcon.className = 'fa-solid fa-play';
+        clearInterval(m1Timer);
+      }
+    }
+
+    function m1Reset() {
+      if (m1IsPlaying) m1TogglePlay();
+      m1RenderStep(1);
+    }
+
+    /* ==========================================================================
+       MODULE 2 & 4 & 5 LOGIC
+       ========================================================================== */
+    const m2Data = {
+      main: {
+        badge: "Composite Annotation Overview",
+        title: "@SpringBootApplication Meta-Annotation",
+        desc: "The primary entrypoint annotation placed on the main application class. It wraps three distinct annotations into one clean interface.",
+        rules: [
+          "Bundles @SpringBootConfiguration, @EnableAutoConfiguration, and @ComponentScan.",
+          "Defines default base package scan roots.",
+          "Allows exclude / excludeName to disable unwanted auto-configurations."
+        ],
+        code: `@SpringBootApplication\npublic class MyApplication {\n    public static void main(String[] args) {\n        SpringApplication.run(MyApplication.class, args);\n    }\n}`
+      },
+      config: {
+        badge: "@SpringBootConfiguration",
+        title: "Spring Configuration Paradigm",
+        desc: "A specialized form of @Configuration. Indicates that the class declares one or more @Bean methods.",
+        rules: [
+          "Identifies the class as a configuration source.",
+          "Ensures CGLIB dynamic proxies intercept @Bean methods to enforce singleton scope."
+        ],
+        code: `@SpringBootConfiguration\npublic class AppConfig {\n    @Bean\n    public RestTemplate restTemplate() {\n        return new RestTemplate();\n    }\n}`
+      },
+      auto: {
+        badge: "@EnableAutoConfiguration",
+        title: "Conditional Framework Auto-Config",
+        desc: "Tells Spring Boot to automatically configure beans based on classpath dependencies.",
+        rules: [
+          "Imports AutoConfigurationImportSelector.",
+          "Reads candidate configurations from SPI files.",
+          "Evaluates @ConditionalOnClass, @ConditionalOnMissingBean, etc."
+        ],
+        code: `@EnableAutoConfiguration`
+      },
+      scan: {
+        badge: "@ComponentScan",
+        title: "Stereotype Package Discovery",
+        desc: "Configures component scanning directives for discovering classes annotated with @Component, @Service, etc.",
+        rules: [
+          "Defaults basePackages to the package of the annotated class.",
+          "Scans child packages recursively."
+        ],
+        code: `@ComponentScan(basePackages = "com.example.ecommerce")`
+      }
+    };
+
+    function m2Select(key) {
+      const d = m2Data[key];
+      if (!d) return;
+
+      document.getElementById('m2Badge').innerText = d.badge;
+      document.getElementById('m2Title').innerText = d.title;
+      document.getElementById('m2Desc').innerText = d.desc;
+      document.getElementById('m2Code').innerText = d.code;
+
+      const ul = document.getElementById('m2Rules');
+      ul.innerHTML = '';
+      d.rules.forEach(r => {
+        const li = document.createElement('li');
+        li.innerText = r;
+        ul.appendChild(li);
+      });
+
+      ['m2MainBox', 'm2ConfigBox', 'm2AutoBox', 'm2ScanBox'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.setAttribute('stroke', '#1f2d47');
+      });
+
+      const activeMap = { main: 'm2MainBox', config: 'm2ConfigBox', auto: 'm2AutoBox', scan: 'm2ScanBox' };
+      const activeEl = document.getElementById(activeMap[key]);
+      if (activeEl) activeEl.setAttribute('stroke', '#6DB33F');
+    }
+
+    function m4SetMode(mode) {
+      const btnTrad = document.getElementById('m4BtnTrad');
+      const btnSpring = document.getElementById('m4BtnSpring');
+      const containerBox = document.getElementById('m4ContainerBox');
+      const containerLabel = document.getElementById('m4ContainerLabel');
+      const title = document.getElementById('m4Title');
+      const desc = document.getElementById('m4Desc');
+      const code = document.getElementById('m4Code');
+      const codeHeader = document.getElementById('m4CodeHeader');
+
+      if (mode === 'traditional') {
+        btnTrad.className = 'px-3 py-1.5 rounded text-xs font-mono bg-rose-500/20 text-rose-300 font-bold border border-rose-500/40';
+        btnSpring.className = 'px-3 py-1.5 rounded text-xs font-mono border border-transparent text-slate-400';
+
+        containerBox.setAttribute('stroke', '#f43f5e');
+        containerLabel.setAttribute('fill', '#f43f5e');
+        containerLabel.textContent = 'TRADITIONAL MANUAL INSTANTIATION (NO CONTAINER)';
+
+        title.innerText = 'Imperative Object Construction';
+        desc.innerText = 'Application code manually manages dependencies using the `new` keyword. Classes are tightly coupled and difficult to mock.';
+        codeHeader.innerText = 'TRADITIONAL JAVA INSTANTIATION:';
+        code.innerText = `OrderRepository repo = new OrderRepository();\nOrderService service = new OrderService(repo);\nOrderController controller = new OrderController(service);`;
+      } else {
+        btnSpring.className = 'px-3 py-1.5 rounded text-xs font-mono bg-spring text-black font-bold transition';
+        btnTrad.className = 'px-3 py-1.5 rounded text-xs font-mono border border-transparent text-slate-400';
+
+        containerBox.setAttribute('stroke', '#6DB33F');
+        containerLabel.setAttribute('fill', '#6DB33F');
+        containerLabel.textContent = 'SPRING APPLICATIONCONTEXT (BEAN FACTORY)';
+
+        title.innerText = 'Spring Inversion of Control (IoC)';
+        desc.innerText = 'Objects do not construct their dependencies. The Spring container inspects metadata and injects dependencies automatically.';
+        codeHeader.innerText = 'SPRING CONSTRUCTOR INJECTION CODE:';
+        code.innerText = `@Service\npublic class OrderService {\n    private final OrderRepository repository;\n    public OrderService(OrderRepository repository) {\n        this.repository = repository;\n    }\n}`;
+      }
+    }
+
+    function m5SetScenario(scenario) {
+      const btnDef = document.getElementById('m5BtnDef');
+      const btnCust = document.getElementById('m5BtnCust');
+      const passBox = document.getElementById('m5BoxPass');
+      const backBox = document.getElementById('m5BoxBack');
+      const badge = document.getElementById('m5Badge');
+      const title = document.getElementById('m5Title');
+      const desc = document.getElementById('m5Desc');
+      const code = document.getElementById('m5Code');
+
+      if (scenario === 'default') {
+        btnDef.className = 'px-3 py-1.5 rounded text-xs font-mono bg-spring text-black font-bold transition';
+        btnCust.className = 'px-3 py-1.5 rounded text-xs font-mono border border-dark-border text-slate-300 transition';
+        passBox.setAttribute('stroke', '#6DB33F');
+        backBox.setAttribute('stroke', '#1f2d47');
+
+        badge.innerText = 'Scenario A: Default Boot Auto-Configuration';
+        title.innerText = 'Default DataSource Auto-Config Active';
+        desc.innerText = 'Spring Boot detects HikariCP and confirms no user DataSource exists. @ConditionalOnMissingBean evaluates to TRUE.';
+        code.innerText = `@AutoConfiguration\n@ConditionalOnMissingBean(type = "javax.sql.DataSource")\npublic class DataSourceAutoConfiguration { ... }`;
+      } else {
+        btnCust.className = 'px-3 py-1.5 rounded text-xs font-mono bg-purple-500 text-white font-bold transition';
+        btnDef.className = 'px-3 py-1.5 rounded text-xs font-mono border border-dark-border text-slate-300 transition';
+        passBox.setAttribute('stroke', '#1f2d47');
+        backBox.setAttribute('stroke', '#f43f5e');
+
+        badge.innerText = 'Scenario B: User Custom @Bean Back-off';
+        title.innerText = 'Auto-Configuration Backs Off';
+        desc.innerText = 'The user provides a custom @Bean DataSource. Spring Boot detects it and skips auto-configuration.';
+        code.innerText = `@Configuration\npublic class DatabaseConfig {\n    @Bean public DataSource customDataSource() { ... }\n}`;
+      }
+    }
+
+    /* ==========================================================================
+       MODULE 6: REQUEST & SECURITY FLOW SIMULATOR
+       ========================================================================== */
+    let currentScenario = 'jwt_success';
+    let currentStepIndex = 0;
+    let isPlaying = false;
+    let m6AnimationTimer = null;
+
+    const componentDetails = {
+      'client': { name: 'Client / Browser', type: 'External Caller', what: 'Web browser or API client initiating HTTP calls.', why: 'Triggers API workflow.', where: 'Outside Application', resp: 'Attaches Auth tokens (Bearer JWT)', prod: 'React App, iOS App', class: 'N/A' },
+      'tomcat': { name: 'Servlet Container (Tomcat)', type: 'Container', what: 'Embedded Web Server.', why: 'Converts TCP streams to HttpServletRequest.', where: 'Servlet Layer', resp: 'Parses network bytes into Request objects.', prod: 'Tomcat', class: 'jakarta.servlet.ServletContainer' },
+      'servlet-filters': { name: 'Servlet Filter Chain', type: 'Filter', what: 'Native Jakarta filters.', why: 'Handles CORS, logging.', where: 'Servlet Container', resp: 'Intercepts requests before Spring.', prod: 'CorsFilter', class: 'jakarta.servlet.Filter' },
+      'delegating-proxy': { name: 'DelegatingFilterProxy', type: 'Bridge Component', what: 'Servlet Filter delegating to Spring Beans.', why: 'Tomcat does not know Spring Beans directly.', where: 'Bridge Layer', resp: 'Delegates to springSecurityFilterChain.', prod: 'DelegatingFilterProxy', class: 'DelegatingFilterProxy.java' },
+      'filter-chain-proxy': { name: 'FilterChainProxy', type: 'Security Central', what: 'Master Spring Security Bean.', why: 'Routes requests to SecurityFilterChain.', where: 'Spring Context', resp: 'Evaluates URL matchers.', prod: 'FilterChainProxy', class: 'FilterChainProxy.java' },
+      'security-filter-chain': { name: 'SecurityFilterChain Container', type: 'Security Container', what: 'List of security filters.', why: 'Modular security.', where: 'Security Layer', resp: 'Applies auth security filters.', prod: 'DefaultSecurityFilterChain', class: 'SecurityFilterChain.java' },
+      'jwt-filter': { name: 'JWT Authentication Filter', type: 'Custom Security Filter', what: 'Parses Bearer JWT headers.', why: 'Stateless API authentication.', where: 'SecurityFilterChain', resp: 'Validates signature, sets SecurityContext.', prod: 'OncePerRequestFilter', class: 'OncePerRequestFilter.java' },
+      'form-filter': { name: 'UsernamePasswordAuthenticationFilter', type: 'Form Auth Filter', what: 'Processes POST /login.', why: 'Session auth.', where: 'SecurityFilterChain', resp: 'Validates credentials via AuthenticationManager.', prod: 'UsernamePasswordAuthenticationFilter', class: 'UsernamePasswordAuthenticationFilter.java' },
+      'authz-filter': { name: 'AuthorizationFilter', type: 'Access Control', what: 'Enforces role permissions.', why: 'Checks HAS_ROLE.', where: 'SecurityFilterChain', resp: 'Verifies SecurityContext roles.', prod: 'AuthorizationFilter', class: 'AuthorizationFilter.java' },
+      'dispatcher-servlet': { name: 'DispatcherServlet', type: 'MVC Front Controller', what: 'Central Spring MVC Servlet.', why: 'Routes URLs to @Controller.', where: 'Spring MVC', resp: 'Maps URL to HandlerMethod.', prod: 'DispatcherServlet', class: 'DispatcherServlet.java' },
+      'interceptor': { name: 'HandlerInterceptor', type: 'MVC Interceptor', what: 'Wraps controller execution.', why: 'Pre/post processing.', where: 'Inside DispatcherServlet', resp: 'preHandle() and postHandle() hooks.', prod: 'HandlerInterceptor', class: 'HandlerInterceptor.java' },
+      'controller': { name: 'REST Controller (@RestController)', type: 'Controller Layer', what: 'Handles HTTP endpoints.', why: 'Exposes API endpoints.', where: 'Application Layer', resp: 'Returns JSON DTOs.', prod: '@RestController', class: 'OrderController.java' },
+      'service': { name: 'Service Layer (@Service)', type: 'Business Layer', what: 'Contains business logic.', why: 'Transaction boundaries.', where: 'Core Application', resp: 'Executes business rules.', prod: '@Service', class: 'OrderServiceImpl.java' },
+      'repository': { name: 'Repository (@Repository)', type: 'Data Access', what: 'Data access abstraction.', why: 'Decouples SQL code.', where: 'Persistence Layer', resp: 'Executes JPA queries.', prod: 'JpaRepository', class: 'OrderRepository.java' },
+      'database': { name: 'Database (RDBMS)', type: 'Storage', what: 'PostgreSQL / MySQL engine.', why: 'Persistent storage.', where: 'Database Infra', resp: 'Stores relational tables.', prod: 'PostgreSQL', class: 'N/A' }
+    };
+
+    const scenarios = {
+      'jwt_success': {
+        title: 'Scenario 1: Successful JWT Authentication (200 OK)',
+        steps: [
+          { node: 'node-client', title: '1. Client Sends HTTP Request', desc: 'Client initiates GET /api/orders with header "Authorization: Bearer valid_jwt_token".', target: 'client' },
+          { node: 'node-tomcat', title: '2. Tomcat Receives Request', desc: 'Tomcat Servlet Container receives network request, wraps it into HttpServletRequest.', target: 'tomcat' },
+          { node: 'node-servlet-filters', title: '3. Servlet Filter Chain Executes', desc: 'Standard filters (CorsFilter, EncodingFilter) execute.', target: 'servlet-filters' },
+          { node: 'node-delegating-proxy', title: '4. DelegatingFilterProxy Bridge', desc: 'DelegatingFilterProxy intercepts request and delegates to springSecurityFilterChain bean.', target: 'delegating-proxy' },
+          { node: 'node-filter-chain-proxy', title: '5. FilterChainProxy Matches Route', desc: 'FilterChainProxy evaluates SecurityFilterChain beans and selects matching API chain.', target: 'filter-chain-proxy' },
+          { node: 'node-jwt-filter', title: '6. JWT Filter Extracts Token', desc: 'JwtAuthenticationFilter extracts Bearer JWT token from header.', target: 'jwt-filter' },
+          { node: 'node-jwt-filter', title: '7. JWT Signature Validated', desc: 'Filter verifies signature with secret key and checks expiration time.', target: 'jwt-filter' },
+          { node: 'node-security-chain', title: '8. SecurityContext Populated', desc: 'Valid token! Authentication object is stored in SecurityContextHolder.', target: 'security-filter-chain' },
+          { node: 'node-authz-filter', title: '9. AuthorizationFilter Checks Access', desc: 'AuthorizationFilter verifies user has ROLE_USER. Access granted.', target: 'authz-filter' },
+          { node: 'node-dispatcher-servlet', title: '10. DispatcherServlet Entry', desc: 'Request enters Spring MVC DispatcherServlet.', target: 'dispatcher-servlet' },
+          { node: 'node-interceptor', title: '11. HandlerInterceptor preHandle()', desc: 'HandlerInterceptor preHandle() executes.', target: 'interceptor' },
+          { node: 'node-controller', title: '12. Controller Method Invoked', desc: '@RestController OrderController.getOrders() receives request payload.', target: 'controller' },
+          { node: 'node-service', title: '13. Service Layer Business Logic', desc: 'OrderService executes transaction logic.', target: 'service' },
+          { node: 'node-repository', title: '14. Repository JPA Query', desc: 'OrderRepository constructs SQL query.', target: 'repository' },
+          { node: 'node-database', title: '15. Database Execution', desc: 'Database executes SQL and returns order records.', target: 'database' },
+          { node: 'node-controller', title: '16. Controller Returns JSON', desc: 'Controller serializes order data into JSON DTO response.', target: 'controller' },
+          { node: 'node-client', title: '17. HTTP 200 OK Delivered', desc: 'Response travels back to client browser with HTTP 200 OK.', target: 'client' }
+        ]
+      },
+      'jwt_auth_fail': {
+        title: 'Scenario 2: Invalid JWT Token (401 Unauthorized)',
+        steps: [
+          { node: 'node-client', title: '1. Client Sends Invalid Token', desc: 'Client sends GET /api/orders with expired or tampered token.', target: 'client' },
+          { node: 'node-tomcat', title: '2. Tomcat Processing', desc: 'Tomcat constructs HttpServletRequest.', target: 'tomcat' },
+          { node: 'node-delegating-proxy', title: '3. DelegatingFilterProxy', desc: 'Delegates request to Spring Security.', target: 'delegating-proxy' },
+          { node: 'node-jwt-filter', title: '4. Token Validation Fails! [401]', desc: 'Signature invalid! Throws BadCredentialsException.', isError: true, target: 'jwt-filter' },
+          { node: 'node-security-chain', title: '5. AuthenticationEntryPoint Triggers', desc: 'AuthenticationEntryPoint writes HTTP 401 response immediately.', isError: true, target: 'security-filter-chain' },
+          { node: 'node-client', title: '6. HTTP 401 Returned', desc: 'HTTP 401 Unauthorized returned to client. DispatcherServlet is NEVER reached!', isError: true, target: 'client' }
+        ]
+      },
+      'jwt_authz_fail': {
+        title: 'Scenario 3: Role Authorization Failure (403 Forbidden)',
+        steps: [
+          { node: 'node-client', title: '1. Client Requests Admin Endpoint', desc: 'Client (ROLE_USER) requests GET /api/admin/users.', target: 'client' },
+          { node: 'node-jwt-filter', title: '2. JWT Auth Succeeds', desc: 'Token valid. SecurityContext populated with user (ROLE_USER).', target: 'jwt-filter' },
+          { node: 'node-authz-filter', title: '3. Authorization Denied! [403]', desc: 'User does NOT have ROLE_ADMIN! Throws AccessDeniedException.', isError: true, target: 'authz-filter' },
+          { node: 'node-client', title: '4. HTTP 403 Forbidden Returned', desc: 'AccessDeniedHandler writes HTTP 403 response. Controller NEVER reached!', isError: true, target: 'client' }
+        ]
+      },
+      'form_login': {
+        title: 'Scenario 4: Form Login Flow (POST /login)',
+        steps: [
+          { node: 'node-client', title: '1. Submits Login Form', desc: 'Client submits POST /login with username=admin&password=secret.', target: 'client' },
+          { node: 'node-form-filter', title: '2. UsernamePasswordFilter Intercepts', desc: 'Extracts credentials and calls AuthenticationManager.', target: 'form-filter' },
+          { node: 'node-security-chain', title: '3. Authentication Successful', desc: 'Principal stored in SecurityContext & HttpSession.', target: 'security-filter-chain' },
+          { node: 'node-client', title: '4. Session Cookie Returned', desc: 'Returns HTTP 200/302 with JSESSIONID cookie.', target: 'client' }
+        ]
+      }
+    };
+
+    function selectComponent(compKey) {
+      const detail = componentDetails[compKey];
+      if (!detail) return;
+
+      const inspector = document.getElementById('inspectorContent');
+      inspector.innerHTML = `
+        <div class="space-y-3">
+          <div>
+            <span class="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-spring/10 text-spring border border-spring/30">${detail.type}</span>
+            <h3 class="text-base font-bold text-white mt-1">${detail.name}</h3>
+          </div>
+          <div><h4 class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">What it is</h4><p class="text-slate-200 mt-0.5">${detail.what}</p></div>
+          <div><h4 class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Why it exists</h4><p class="text-slate-300 mt-0.5">${detail.why}</p></div>
+          <div><h4 class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Execution Location</h4><p class="text-slate-300 font-mono mt-0.5 text-[11px]">${detail.where}</p></div>
+          <div class="bg-dark-bg p-2.5 rounded border border-dark-border"><h4 class="text-[10px] font-bold text-spring uppercase font-mono">Spring Class / Interface</h4><p class="text-slate-200 font-mono text-[11px] mt-0.5 break-all">${detail.class}</p></div>
+        </div>
+      `;
+    }
+
+    function m6ChangeScenario() {
+      m6PauseAnimation();
+      currentScenario = document.getElementById('m6ScenarioSelect').value;
+      currentStepIndex = 0;
+      m6UpdateStepView();
+    }
+
+    function m6UpdateStepView() {
+      const scenarioData = scenarios[currentScenario];
+      const currentStep = scenarioData.steps[currentStepIndex];
+
+      document.querySelectorAll('.arch-node').forEach(node => {
+        node.classList.remove('node-active', 'node-active-error');
+      });
+
+      const activeNode = document.getElementById(currentStep.node);
+      if (activeNode) {
+        if (currentStep.isError) {
+          activeNode.classList.add('node-active-error');
+        } else {
+          activeNode.classList.add('node-active');
+        }
+      }
+
+      document.getElementById('m6ScenarioTag').innerText = scenarioData.title;
+      document.getElementById('m6StepCounter').innerText = `Step ${currentStepIndex + 1} of ${scenarioData.steps.length}`;
+      const progressPct = ((currentStepIndex + 1) / scenarioData.steps.length) * 100;
+      document.getElementById('m6ProgressBar').style.width = `${progressPct}%`;
+
+      document.getElementById('m6StepTitle').innerText = currentStep.title;
+      document.getElementById('m6StepDescription').innerText = currentStep.desc;
+
+      const iconBox = document.getElementById('m6StepStatusIcon');
+      if (currentStep.isError) {
+        iconBox.className = 'mt-0.5 text-red-400 text-lg';
+        iconBox.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>';
+      } else {
+        iconBox.className = 'mt-0.5 text-spring text-lg';
+        iconBox.innerHTML = '<i class="fa-solid fa-circle-check"></i>';
+      }
+
+      if (currentStep.target) selectComponent(currentStep.target);
+      m6PositionPacket(activeNode);
+      speakText(`${currentStep.title}. ${currentStep.desc}`);
+    }
+
+    function m6PositionPacket(targetNode) {
+      const packet = document.getElementById('m6RequestPacket');
+      const container = document.getElementById('m6DiagramContainer');
+
+      if (!targetNode || !container) {
+        packet.classList.add('hidden');
+        return;
+      }
+
+      const containerRect = container.getBoundingClientRect();
+      const nodeRect = targetNode.getBoundingClientRect();
+
+      const topPos = (nodeRect.top - containerRect.top) + (nodeRect.height / 2) - 12;
+      const leftPos = (nodeRect.left - containerRect.left) + (nodeRect.width / 2) - 12;
+
+      packet.style.top = `${topPos}px`;
+      packet.style.left = `${leftPos}px`;
+      packet.classList.remove('hidden');
+    }
+
+    function m6TogglePlayPause() {
+      if (isPlaying) {
+        m6PauseAnimation();
+      } else {
+        m6PlayAnimation();
+      }
+    }
+
+    function m6PlayAnimation() {
+      isPlaying = true;
+      document.getElementById('m6PlayIcon').className = 'fa-solid fa-pause';
+      document.getElementById('m6PlayBtnText').innerText = 'Pause';
+
+      const stepDuration = 2200 / animationSpeed;
+      
+      function stepLoop() {
+        const scenarioData = scenarios[currentScenario];
+        if (currentStepIndex < scenarioData.steps.length - 1) {
+          currentStepIndex++;
+          m6UpdateStepView();
+          m6AnimationTimer = setTimeout(stepLoop, stepDuration);
+        } else {
+          m6PauseAnimation();
+        }
+      }
+
+      m6AnimationTimer = setTimeout(stepLoop, stepDuration);
+    }
+
+    function m6PauseAnimation() {
+      isPlaying = false;
+      if (m6AnimationTimer) clearTimeout(m6AnimationTimer);
+      document.getElementById('m6PlayIcon').className = 'fa-solid fa-play';
+      document.getElementById('m6PlayBtnText').innerText = 'Play Flow';
+      if (synth) synth.cancel();
+    }
+
+    function m6RestartAnimation() {
+      m6PauseAnimation();
+      currentStepIndex = 0;
+      m6UpdateStepView();
+    }
+
+    function m6NextStep() {
+      m6PauseAnimation();
+      const scenarioData = scenarios[currentScenario];
+      if (currentStepIndex < scenarioData.steps.length - 1) {
+        currentStepIndex++;
+        m6UpdateStepView();
+      }
+    }
+
+    function m6PrevStep() {
+      m6PauseAnimation();
+      if (currentStepIndex > 0) {
+        currentStepIndex--;
+        m6UpdateStepView();
+      }
+    }
+
+    /* ==========================================================================
+       MODULE 8 & 9 DATA & LOGIC
+       ========================================================================== */
+    const qaData = [
+      { q: "1. What happens internally when SpringApplication.run() executes?", a: "Deduces web type, creates ApplicationContext, prepares Environment, runs BeanFactoryPostProcessors, scans components, loads auto-configurations, instantiates singletons, and starts embedded Tomcat." },
+      { q: "2. What is the Spring ApplicationContext?", a: "Central IoC Container managing bean lifecycle, event publishing, i18n, and environment property abstractions." },
+      { q: "3. Difference between BeanFactory and ApplicationContext?", a: "BeanFactory provides basic IoC lookup. ApplicationContext adds eager singletons, AOP, events, and web server integration." },
+      { q: "4. What is @SpringBootApplication?", a: "Meta-annotation bundling @SpringBootConfiguration, @EnableAutoConfiguration, and @ComponentScan." },
+      { q: "5. What is DelegatingFilterProxy?", a: "Servlet Filter registered in Tomcat that bridges requests to Spring-managed springSecurityFilterChain Bean." },
+      { q: "6. What is FilterChainProxy?", a: "Master Spring Security Bean that iterates registered SecurityFilterChains by order and executes security filters." }
+    ];
+
+    function renderQA() {
+      const list = document.getElementById('qaList');
+      if (!list) return;
+      list.innerHTML = '';
+      qaData.forEach((item, index) => {
+        const div = document.createElement('div');
+        div.className = 'bg-dark-card border border-dark-border rounded-xl overflow-hidden qa-item';
+        div.innerHTML = `
+          <button onclick="toggleQA(${index})" class="w-full p-4 text-left font-semibold text-xs text-slate-200 hover:text-spring flex justify-between items-center gap-4 focus:outline-none">
+            <span>${item.q}</span>
+            <i class="fa-solid fa-chevron-down text-slate-400 transition-transform" id="qaIcon${index}"></i>
+          </button>
+          <div id="qaAns${index}" class="hidden p-4 pt-0 text-xs text-slate-300 leading-relaxed border-t border-dark-border/40 bg-dark-bg/50">
+            ${item.a}
+          </div>
+        `;
+        list.appendChild(div);
+      });
+    }
+
+    function toggleQA(index) {
+      const ans = document.getElementById(`qaAns${index}`);
+      const icon = document.getElementById(`qaIcon${index}`);
+      ans.classList.toggle('hidden');
+      icon.classList.toggle('rotate-180');
+    }
+
+    function filterQA() {
+      const q = document.getElementById('qaSearchInput').value.toLowerCase();
+      document.querySelectorAll('.qa-item').forEach(item => {
+        const text = item.innerText.toLowerCase();
+        item.style.display = text.includes(q) ? 'block' : 'none';
+      });
+    }
+
+    const quizQuestions = [
+      { id: 1, question: "In Spring Boot 3.x, where are auto-configuration candidates declared?", options: ["META-INF/spring.factories", "META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports", "application.properties"], correct: 1, explanation: "Spring Boot 3.x uses the plain-text .imports file for SPI auto-configuration candidate declarations." },
+      { id: 2, question: "What connects Tomcat filter infrastructure to Spring Security Beans?", options: ["DispatcherServlet", "DelegatingFilterProxy", "HandlerInterceptor"], correct: 1, explanation: "DelegatingFilterProxy is a standard Tomcat Servlet Filter that delegates execution to the springSecurityFilterChain bean." }
+    ];
+
+    let userAnswers = {};
+
+    function renderQuiz() {
+      const container = document.getElementById('quizContainer');
+      if (!container) return;
+      container.innerHTML = '';
+      document.getElementById('quizTotal').innerText = quizQuestions.length;
+
+      quizQuestions.forEach((q, qIndex) => {
+        const card = document.createElement('div');
+        card.className = 'bg-dark-bg border border-dark-border rounded-xl p-5 space-y-4';
+        
+        let optionsHtml = '';
+        q.options.forEach((opt, oIndex) => {
+          optionsHtml += `
+            <label class="flex items-start gap-3 p-3 rounded-lg border border-dark-border bg-dark-card/50 cursor-pointer hover:border-spring/50 transition">
+              <input type="radio" name="q${q.id}" value="${oIndex}" onchange="selectQuizOption(${q.id}, ${oIndex})" class="mt-0.5 text-spring focus:ring-spring">
+              <span class="text-xs text-slate-200">${opt}</span>
+            </label>
+          `;
+        });
+
+        card.innerHTML = `
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-mono text-spring font-bold">QUESTION ${qIndex + 1} OF ${quizQuestions.length}</span>
+          </div>
+          <h4 class="text-sm font-bold text-white">${q.question}</h4>
+          <div class="space-y-2">${optionsHtml}</div>
+          <div id="quizFeedback${q.id}" class="hidden p-3 rounded-lg text-xs leading-relaxed font-mono"></div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    function selectQuizOption(qId, oIndex) {
+      userAnswers[qId] = oIndex;
+      const qObj = quizQuestions.find(item => item.id === qId);
+      const feedback = document.getElementById(`quizFeedback${qId}`);
+      feedback.classList.remove('hidden', 'bg-emerald-500/10', 'text-emerald-400', 'border-emerald-500/30', 'bg-rose-500/10', 'text-rose-300', 'border-rose-500/30');
+
+      if (oIndex === qObj.correct) {
+        feedback.classList.add('bg-emerald-500/10', 'text-emerald-400', 'border', 'border-emerald-500/30');
+        feedback.innerHTML = `<i class="fa-solid fa-circle-check"></i> Correct! ${qObj.explanation}`;
+      } else {
+        feedback.classList.add('bg-rose-500/10', 'text-rose-300', 'border', 'border-rose-500/30');
+        feedback.innerHTML = `<i class="fa-solid fa-circle-xmark"></i> Incorrect. ${qObj.explanation}`;
+      }
+
+      let score = 0;
+      quizQuestions.forEach(item => {
+        if (userAnswers[item.id] === item.correct) score++;
+      });
+      document.getElementById('quizScore').innerText = score;
+    }
+
+    window.onload = function() {
+      m1RenderStep(1);
+      m2Select('main');
+      m6UpdateStepView();
+      selectComponent('tomcat');
+      renderQA();
+      renderQuiz();
+
+      window.addEventListener('resize', () => {
+        const scenarioData = scenarios[currentScenario];
+        const currentStep = scenarioData.steps[currentStepIndex];
+        const activeNode = document.getElementById(currentStep.node);
+        if (activeNode) m6PositionPacket(activeNode);
+      });
+    };
+  </script>
+</body>
+</html>

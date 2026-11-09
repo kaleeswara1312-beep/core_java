@@ -1,0 +1,1234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spring Security & MVC Execution Flow Visualizer</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        slate: {
+                            850: '#1e293b',
+                            900: '#0f172a',
+                            950: '#020617',
+                        },
+                        spring: {
+                            500: '#6db33f',
+                            600: '#5ba032',
+                            700: '#488225',
+                        },
+                        layer: {
+                            client: '#3b82f6',
+                            container: '#8b5cf6',
+                            security: '#ec4899',
+                            mvc: '#f59e0b',
+                            app: '#10b981',
+                            db: '#06b6d4'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+                        mono: ['Fira Code', 'Monaco', 'Consolas', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+
+        /* SVG & Connection Styling */
+        .flow-path {
+            stroke-dasharray: 6, 6;
+            animation: dash 1s linear infinite;
+        }
+        @keyframes dash {
+            to {
+                stroke-dashoffset: -12;
+            }
+        }
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 15px rgba(109, 179, 63, 0.4); }
+            50% { box-shadow: 0 0 25px rgba(109, 179, 63, 0.8); }
+        }
+        @keyframes pulse-glow-error {
+            0%, 100% { box-shadow: 0 0 15px rgba(239, 68, 68, 0.4); }
+            50% { box-shadow: 0 0 25px rgba(239, 68, 68, 0.8); }
+        }
+        .node-active {
+            animation: pulse-glow 1.5s infinite;
+            border-color: #6db33f !important;
+            transform: scale(1.02);
+        }
+        .node-active-error {
+            animation: pulse-glow-error 1.5s infinite;
+            border-color: #ef4444 !important;
+            transform: scale(1.02);
+        }
+        
+        /* Smooth Component Transitions */
+        .arch-node {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* Tab styling */
+        .tab-btn.active {
+            border-bottom-color: #6db33f;
+            color: #6db33f;
+        }
+
+        /* Animated Packet */
+        #requestPacket {
+            transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            filter: drop-shadow(0 0 8px currentColor);
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans min-h-screen flex flex-col antialiased selection:bg-spring-500 selection:text-slate-950">
+
+    <!-- Header / Navbar -->
+    <header class="bg-slate-900/80 backdrop-blur border-b border-slate-800 sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap justify-between items-center gap-4">
+            <div class="flex items-center space-x-3">
+                <div class="bg-spring-500/20 p-2 rounded-lg border border-spring-500/40 text-spring-500">
+                    <i class="fa-solid fa-shield-halved text-2xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+                        Spring Architecture Visualizer
+                        <span class="text-xs font-semibold px-2 py-0.5 rounded bg-spring-500/10 text-spring-500 border border-spring-500/30">Spring Boot 3.x</span>
+                    </h1>
+                    <p class="text-xs text-slate-400">Interactive Execution Flow & Spring Security Deep-Dive</p>
+                </div>
+            </div>
+
+            <!-- Tab Navigation -->
+            <nav class="flex space-x-1 sm:space-x-4 border-b sm:border-b-0 border-slate-800 text-sm font-medium">
+                <button onclick="switchTab('simulator')" id="tab-simulator" class="tab-btn active px-3 py-2 border-b-2 border-transparent hover:text-spring-500 flex items-center gap-2">
+                    <i class="fa-solid fa-diagram-project"></i> Execution Flow
+                </button>
+                <button onclick="switchTab('comparisons')" id="tab-comparisons" class="tab-btn px-3 py-2 border-b-2 border-transparent hover:text-spring-500 flex items-center gap-2">
+                    <i class="fa-solid fa-table-columns"></i> Component Matrix
+                </button>
+                <button onclick="switchTab('multichain')" id="tab-multichain" class="tab-btn px-3 py-2 border-b-2 border-transparent hover:text-spring-500 flex items-center gap-2">
+                    <i class="fa-solid fa-code-branch"></i> Multi-FilterChain
+                </button>
+                <button onclick="switchTab('quiz')" id="tab-quiz" class="tab-btn px-3 py-2 border-b-2 border-transparent hover:text-spring-500 flex items-center gap-2">
+                    <i class="fa-solid fa-graduation-cap"></i> Interview & Quiz
+                </button>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        <!-- TAB 1: INTERACTIVE SIMULATOR -->
+        <section id="view-simulator" class="space-y-6">
+            
+            <!-- Controls Bar -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-xl flex flex-wrap items-center justify-between gap-4">
+                
+                <!-- Scenario Dropdown -->
+                <div class="flex items-center space-x-3 w-full lg:w-auto">
+                    <label for="scenarioSelect" class="text-xs font-semibold uppercase tracking-wider text-slate-400 whitespace-nowrap">Scenario:</label>
+                    <select id="scenarioSelect" onchange="changeScenario()" class="bg-slate-950 text-slate-200 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-spring-500 w-full sm:w-80">
+                        <option value="jwt_success">1. GET /api/orders (JWT Success - 200 OK)</option>
+                        <option value="jwt_auth_fail">2. GET /api/orders (Invalid JWT - 401 Unauthorized)</option>
+                        <option value="jwt_authz_fail">3. GET /api/admin/users (Forbidden Role - 403 Forbidden)</option>
+                        <option value="form_login">4. POST /login (Username/Password Form Login Flow)</option>
+                    </select>
+                </div>
+
+                <!-- Playback & Audio Controls -->
+                <div class="flex items-center space-x-2">
+                    <!-- Audio Toggle Button -->
+                    <button id="audioToggleBtn" onclick="toggleAudio()" title="Toggle Voice Sound/Audio Narration" class="bg-slate-800 hover:bg-slate-700 text-slate-400 p-2.5 rounded-lg border border-slate-700 transition flex items-center gap-1.5 font-medium text-xs">
+                        <i id="audioIcon" class="fa-solid fa-volume-xmark text-slate-400"></i>
+                        <span id="audioStatusText" class="hidden sm:inline">Voice OFF</span>
+                    </button>
+
+                    <div class="h-6 w-px bg-slate-800 mx-1"></div>
+
+                    <button onclick="restartAnimation()" title="Restart" class="bg-slate-800 hover:bg-slate-700 text-slate-300 p-2.5 rounded-lg border border-slate-700 transition">
+                        <i class="fa-solid fa-rotate-left"></i>
+                    </button>
+                    <button onclick="prevStep()" title="Previous Step" class="bg-slate-800 hover:bg-slate-700 text-slate-300 p-2.5 rounded-lg border border-slate-700 transition">
+                        <i class="fa-solid fa-backward-step"></i>
+                    </button>
+                    <button id="playPauseBtn" onclick="togglePlayPause()" title="Play" class="bg-spring-600 hover:bg-spring-500 text-slate-950 font-bold px-4 py-2.5 rounded-lg border border-spring-400 transition flex items-center space-x-2">
+                        <i id="playIcon" class="fa-solid fa-play"></i>
+                        <span id="playBtnText">Play Flow</span>
+                    </button>
+                    <button onclick="nextStep()" title="Next Step" class="bg-slate-800 hover:bg-slate-700 text-slate-300 p-2.5 rounded-lg border border-slate-700 transition">
+                        <i class="fa-solid fa-forward-step"></i>
+                    </button>
+                </div>
+
+                <!-- Speed Selector -->
+                <div class="flex items-center space-x-2 text-xs font-medium text-slate-400">
+                    <span>Speed:</span>
+                    <button onclick="setSpeed(0.5)" id="speed-0.5" class="speed-btn px-2.5 py-1 rounded bg-slate-800 border border-slate-700 hover:text-white">0.5x</button>
+                    <button onclick="setSpeed(1)" id="speed-1" class="speed-btn px-2.5 py-1 rounded bg-spring-500/20 text-spring-400 border border-spring-500/40">1x</button>
+                    <button onclick="setSpeed(2)" id="speed-2" class="speed-btn px-2.5 py-1 rounded bg-slate-800 border border-slate-700 hover:text-white">2x</button>
+                </div>
+            </div>
+
+            <!-- Progress Bar & Active Step Banner -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-lg space-y-3">
+                <div class="flex justify-between items-center text-xs font-mono">
+                    <span id="stepCounter" class="text-spring-400 font-semibold">Step 1 of 17</span>
+                    <span id="scenarioTag" class="bg-slate-800 text-slate-300 px-2.5 py-0.5 rounded border border-slate-700">JWT Success Flow</span>
+                </div>
+                <div class="w-full bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-800">
+                    <div id="progressBar" class="bg-spring-500 h-2 transition-all duration-300" style="width: 5%;"></div>
+                </div>
+                <div class="flex items-start space-x-3 pt-1">
+                    <div id="stepStatusIcon" class="mt-0.5 text-spring-400 text-lg">
+                        <i class="fa-solid fa-circle-info"></i>
+                    </div>
+                    <div>
+                        <h3 id="stepTitle" class="text-sm font-bold text-white">Browser Initiates Request</h3>
+                        <p id="stepDescription" class="text-xs text-slate-300 mt-0.5 leading-relaxed">The client initiates an HTTP GET request to /api/orders containing a Bearer Authorization header.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Diagram Area & Interactive Sidebar Grid -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                
+                <!-- Architecture Canvas (Visual Nodes) -->
+                <div class="lg:col-span-8 bg-slate-900 border border-slate-800 rounded-xl p-4 sm:p-6 shadow-2xl relative overflow-hidden">
+                    
+                    <!-- Color Coding Legend -->
+                    <div class="flex flex-wrap items-center gap-3 mb-6 pb-4 border-b border-slate-800/80 text-[11px] font-medium">
+                        <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-layer-client"></span> Client</span>
+                        <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-layer-container"></span> Tomcat Container</span>
+                        <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-layer-security"></span> Spring Security</span>
+                        <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-layer-mvc"></span> Spring MVC</span>
+                        <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-layer-app"></span> Application Layer</span>
+                        <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-layer-db"></span> Database</span>
+                    </div>
+
+                    <!-- Flow Diagram Grid -->
+                    <div class="relative space-y-4 font-mono text-xs" id="diagramContainer">
+                        
+                        <!-- Packet Indicator (Positioned dynamically) -->
+                        <div id="requestPacket" class="absolute z-30 hidden w-6 h-6 rounded-full bg-spring-500 text-slate-950 flex items-center justify-center font-bold shadow-lg text-[10px] pointer-events-none">
+                            <i class="fa-solid fa-paper-plane"></i>
+                        </div>
+
+                        <!-- 1. Client -->
+                        <div id="node-client" onclick="selectComponent('client')" class="arch-node cursor-pointer bg-slate-950 border-2 border-layer-client/50 hover:border-layer-client rounded-lg p-3 text-slate-200 flex items-center justify-between group shadow-md">
+                            <div class="flex items-center space-x-3">
+                                <div class="bg-layer-client/20 text-layer-client p-2 rounded"><i class="fa-solid fa-globe text-base"></i></div>
+                                <div>
+                                    <h4 class="font-bold text-white group-hover:text-layer-client transition">Client / Browser</h4>
+                                    <p class="text-[10px] text-slate-400">Sends HTTP Request with Headers / Auth Tokens</p>
+                                </div>
+                            </div>
+                            <span class="text-[10px] bg-slate-900 border border-slate-700 text-slate-400 px-2 py-1 rounded">External</span>
+                        </div>
+
+                        <!-- Connector -->
+                        <div class="flex justify-center my-1"><i class="fa-solid fa-arrow-down text-slate-600"></i></div>
+
+                        <!-- 2. Servlet Container (Tomcat) -->
+                        <div id="node-tomcat" onclick="selectComponent('tomcat')" class="arch-node cursor-pointer bg-slate-950 border-2 border-layer-container/50 hover:border-layer-container rounded-lg p-3 text-slate-200 flex items-center justify-between group shadow-md">
+                            <div class="flex items-center space-x-3">
+                                <div class="bg-layer-container/20 text-layer-container p-2 rounded"><i class="fa-solid fa-server text-base"></i></div>
+                                <div>
+                                    <h4 class="font-bold text-white group-hover:text-layer-container transition">Servlet Container (Tomcat)</h4>
+                                    <p class="text-[10px] text-slate-400">Creates HttpServletRequest / Response & Invokes Filter Chain</p>
+                                </div>
+                            </div>
+                            <span class="text-[10px] bg-slate-900 border border-slate-700 text-slate-400 px-2 py-1 rounded">Container</span>
+                        </div>
+
+                        <!-- Connector -->
+                        <div class="flex justify-center my-1"><i class="fa-solid fa-arrow-down text-slate-600"></i></div>
+
+                        <!-- 3. Standard Servlet Filter Chain -->
+                        <div id="node-servlet-filters" onclick="selectComponent('servlet-filters')" class="arch-node cursor-pointer bg-slate-950 border-2 border-layer-container/50 hover:border-layer-container rounded-lg p-3 text-slate-200 flex items-center justify-between group shadow-md">
+                            <div class="flex items-center space-x-3">
+                                <div class="bg-layer-container/20 text-layer-container p-2 rounded"><i class="fa-solid fa-filter text-base"></i></div>
+                                <div>
+                                    <h4 class="font-bold text-white group-hover:text-layer-container transition">Servlet Filter Chain</h4>
+                                    <p class="text-[10px] text-slate-400">Standard JavaEE/Jakarta Filters (CorsFilter, CharacterEncodingFilter)</p>
+                                </div>
+                            </div>
+                            <span class="text-[10px] bg-slate-900 border border-slate-700 text-slate-400 px-2 py-1 rounded">javax.servlet</span>
+                        </div>
+
+                        <!-- Connector -->
+                        <div class="flex justify-center my-1"><i class="fa-solid fa-arrow-down text-slate-600"></i></div>
+
+                        <!-- 4. DelegatingFilterProxy -->
+                        <div id="node-delegating-proxy" onclick="selectComponent('delegating-proxy')" class="arch-node cursor-pointer bg-slate-950 border-2 border-layer-security/50 hover:border-layer-security rounded-lg p-3 text-slate-200 flex items-center justify-between group shadow-md">
+                            <div class="flex items-center space-x-3">
+                                <div class="bg-layer-security/20 text-layer-security p-2 rounded"><i class="fa-solid fa-bridge text-base"></i></div>
+                                <div>
+                                    <h4 class="font-bold text-white group-hover:text-layer-security transition">DelegatingFilterProxy</h4>
+                                    <p class="text-[10px] text-slate-400">Servlet Filter bridge that delegates to Spring-managed Bean</p>
+                                </div>
+                            </div>
+                            <span class="text-[10px] bg-spring-500/10 border border-spring-500/30 text-spring-400 px-2 py-1 rounded">Bridge</span>
+                        </div>
+
+                        <!-- Connector -->
+                        <div class="flex justify-center my-1"><i class="fa-solid fa-arrow-down text-slate-600"></i></div>
+
+                        <!-- 5. FilterChainProxy -->
+                        <div id="node-filter-chain-proxy" onclick="selectComponent('filter-chain-proxy')" class="arch-node cursor-pointer bg-slate-950 border-2 border-layer-security/50 hover:border-layer-security rounded-lg p-3 text-slate-200 flex items-center justify-between group shadow-md">
+                            <div class="flex items-center space-x-3">
+                                <div class="bg-layer-security/20 text-layer-security p-2 rounded"><i class="fa-solid fa-sitemap text-base"></i></div>
+                                <div>
+                                    <h4 class="font-bold text-white group-hover:text-layer-security transition">FilterChainProxy (springSecurityFilterChain)</h4>
+                                    <p class="text-[10px] text-slate-400">Spring Security entry point. Selects matching SecurityFilterChain</p>
+                                </div>
+                            </div>
+                            <span class="text-[10px] bg-layer-security/20 text-layer-security border border-layer-security/40 px-2 py-1 rounded">Bean</span>
+                        </div>
+
+                        <!-- Connector -->
+                        <div class="flex justify-center my-1"><i class="fa-solid fa-arrow-down text-slate-600"></i></div>
+
+                        <!-- 6. SecurityFilterChain Container -->
+                        <div id="node-security-chain" class="bg-slate-950 border-2 border-layer-security rounded-xl p-4 space-y-3 shadow-lg">
+                            <div onclick="selectComponent('security-filter-chain')" class="flex items-center justify-between cursor-pointer border-b border-slate-800 pb-2">
+                                <div class="flex items-center space-x-2">
+                                    <i class="fa-solid fa-shield text-layer-security"></i>
+                                    <h4 class="font-bold text-white hover:text-layer-security transition">Selected SecurityFilterChain</h4>
+                                </div>
+                                <span class="text-[10px] bg-slate-900 border border-slate-700 text-slate-400 px-2 py-0.5 rounded">Security Context</span>
+                            </div>
+
+                            <!-- Inside Security Filters Grid -->
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                <div id="node-jwt-filter" onclick="selectComponent('jwt-filter')" class="arch-node cursor-pointer bg-slate-900 border border-slate-700 hover:border-layer-security p-2.5 rounded text-center">
+                                    <div class="text-xs font-bold text-slate-200">JWT Auth Filter</div>
+                                    <p class="text-[9px] text-slate-400 mt-0.5">Validates Bearer Token</p>
+                                </div>
+                                <div id="node-form-filter" onclick="selectComponent('form-filter')" class="arch-node cursor-pointer bg-slate-900 border border-slate-700 hover:border-layer-security p-2.5 rounded text-center">
+                                    <div class="text-xs font-bold text-slate-200">UsernamePassword Auth Filter</div>
+                                    <p class="text-[9px] text-slate-400 mt-0.5">Form POST /login</p>
+                                </div>
+                                <div id="node-authz-filter" onclick="selectComponent('authz-filter')" class="arch-node cursor-pointer bg-slate-900 border border-slate-700 hover:border-layer-security p-2.5 rounded text-center">
+                                    <div class="text-xs font-bold text-slate-200">AuthorizationFilter</div>
+                                    <p class="text-[9px] text-slate-400 mt-0.5">Checks Role/Authority</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Connector -->
+                        <div class="flex justify-center my-1"><i class="fa-solid fa-arrow-down text-slate-600"></i></div>
+
+                        <!-- 7. DispatcherServlet -->
+                        <div id="node-dispatcher-servlet" onclick="selectComponent('dispatcher-servlet')" class="arch-node cursor-pointer bg-slate-950 border-2 border-layer-mvc/50 hover:border-layer-mvc rounded-lg p-3 text-slate-200 flex items-center justify-between group shadow-md">
+                            <div class="flex items-center space-x-3">
+                                <div class="bg-layer-mvc/20 text-layer-mvc p-2 rounded"><i class="fa-solid fa-route text-base"></i></div>
+                                <div>
+                                    <h4 class="font-bold text-white group-hover:text-layer-mvc transition">DispatcherServlet</h4>
+                                    <p class="text-[10px] text-slate-400">Spring MVC Front Controller. Resolves Handlers & Interceptors</p>
+                                </div>
+                            </div>
+                            <span class="text-[10px] bg-slate-900 border border-slate-700 text-slate-400 px-2 py-1 rounded">Spring MVC</span>
+                        </div>
+
+                        <!-- Connector -->
+                        <div class="flex justify-center my-1"><i class="fa-solid fa-arrow-down text-slate-600"></i></div>
+
+                        <!-- 8. HandlerInterceptor -->
+                        <div id="node-interceptor" onclick="selectComponent('interceptor')" class="arch-node cursor-pointer bg-slate-950 border-2 border-layer-mvc/50 hover:border-layer-mvc rounded-lg p-3 text-slate-200 flex items-center justify-between group shadow-md">
+                            <div class="flex items-center space-x-3">
+                                <div class="bg-layer-mvc/20 text-layer-mvc p-2 rounded"><i class="fa-solid fa-list-check text-base"></i></div>
+                                <div>
+                                    <h4 class="font-bold text-white group-hover:text-layer-mvc transition">Spring MVC Interceptor (HandlerInterceptor)</h4>
+                                    <p class="text-[10px] text-slate-400">preHandle() / postHandle() execution around Handler</p>
+                                </div>
+                            </div>
+                            <span class="text-[10px] bg-slate-900 border border-slate-700 text-slate-400 px-2 py-1 rounded">MVC Interceptor</span>
+                        </div>
+
+                        <!-- Connector -->
+                        <div class="flex justify-center my-1"><i class="fa-solid fa-arrow-down text-slate-600"></i></div>
+
+                        <!-- 9. Application Layers (Controller -> Service -> Repository) -->
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            <div id="node-controller" onclick="selectComponent('controller')" class="arch-node cursor-pointer bg-slate-950 border-2 border-layer-app/50 hover:border-layer-app p-3 rounded-lg text-center shadow-md">
+                                <div class="bg-layer-app/20 text-layer-app p-1.5 rounded w-fit mx-auto mb-1"><i class="fa-solid fa-code"></i></div>
+                                <h5 class="font-bold text-white text-xs">Controller</h5>
+                                <p class="text-[9px] text-slate-400">@RestController</p>
+                            </div>
+
+                            <div id="node-service" onclick="selectComponent('service')" class="arch-node cursor-pointer bg-slate-950 border-2 border-layer-app/50 hover:border-layer-app p-3 rounded-lg text-center shadow-md">
+                                <div class="bg-layer-app/20 text-layer-app p-1.5 rounded w-fit mx-auto mb-1"><i class="fa-solid fa-gear"></i></div>
+                                <h5 class="font-bold text-white text-xs">Service</h5>
+                                <p class="text-[9px] text-slate-400">@Service Business Logic</p>
+                            </div>
+
+                            <div id="node-repository" onclick="selectComponent('repository')" class="arch-node cursor-pointer bg-slate-950 border-2 border-layer-app/50 hover:border-layer-app p-3 rounded-lg text-center shadow-md">
+                                <div class="bg-layer-app/20 text-layer-app p-1.5 rounded w-fit mx-auto mb-1"><i class="fa-solid fa-box-archive"></i></div>
+                                <h5 class="font-bold text-white text-xs">Repository</h5>
+                                <p class="text-[9px] text-slate-400">@Repository / JPA</p>
+                            </div>
+                        </div>
+
+                        <!-- Connector -->
+                        <div class="flex justify-center my-1"><i class="fa-solid fa-arrow-down text-slate-600"></i></div>
+
+                        <!-- 10. Database -->
+                        <div id="node-database" onclick="selectComponent('database')" class="arch-node cursor-pointer bg-slate-950 border-2 border-layer-db/50 hover:border-layer-db rounded-lg p-3 text-slate-200 flex items-center justify-between group shadow-md">
+                            <div class="flex items-center space-x-3">
+                                <div class="bg-layer-db/20 text-layer-db p-2 rounded"><i class="fa-solid fa-database text-base"></i></div>
+                                <div>
+                                    <h4 class="font-bold text-white group-hover:text-layer-db transition">Database (PostgreSQL / MySQL)</h4>
+                                    <p class="text-[10px] text-slate-400">Stores persistent user, order, and domain data</p>
+                                </div>
+                            </div>
+                            <span class="text-[10px] bg-slate-900 border border-slate-700 text-slate-400 px-2 py-1 rounded">Data Storage</span>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- Component Inspector Sidebar -->
+                <div class="lg:col-span-4 bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl space-y-4 sticky top-20">
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <div class="flex items-center space-x-2 text-spring-400 font-bold text-sm uppercase tracking-wider">
+                            <i class="fa-solid fa-microscope"></i>
+                            <span>Component Inspector</span>
+                        </div>
+                        <span class="text-[10px] text-slate-500">Click any component to inspect</span>
+                    </div>
+
+                    <!-- Dynamic Details Panel -->
+                    <div id="inspectorContent" class="space-y-4 text-xs">
+                        <div class="text-center py-10 text-slate-500">
+                            <i class="fa-solid fa-hand-pointer text-3xl mb-2 block text-slate-600"></i>
+                            <p>Click on any architecture box above to view technical breakdown, Spring class names, interview explanations, and real-world usage.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 2: COMPONENT COMPARISON MATRIX -->
+        <section id="view-comparisons" class="hidden space-y-6">
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-xl space-y-6">
+                <div>
+                    <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-table text-spring-500"></i>
+                        Architectural Comparison Matrix
+                    </h2>
+                    <p class="text-xs text-slate-400 mt-1">Detailed comparison between Servlet Filters, Spring Security Filters, and Spring MVC Interceptors.</p>
+                </div>
+
+                <!-- Table 1: Filter vs Security Filter vs Interceptor -->
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs border-collapse">
+                        <thead>
+                            <tr class="bg-slate-950 border-b border-slate-800 text-slate-300 font-mono">
+                                <th class="p-3 border-r border-slate-800">Feature</th>
+                                <th class="p-3 border-r border-slate-800 text-layer-container">Servlet Filter</th>
+                                <th class="p-3 border-r border-slate-800 text-layer-security">Spring Security Filter</th>
+                                <th class="p-3 text-layer-mvc">Spring MVC Interceptor</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-800 text-slate-300">
+                            <tr class="hover:bg-slate-850">
+                                <td class="p-3 font-semibold text-slate-400 border-r border-slate-800">Belongs To</td>
+                                <td class="p-3 border-r border-slate-800">Servlet Container (Tomcat/Jetty)</td>
+                                <td class="p-3 border-r border-slate-800">Spring ApplicationContext (Managed Beans)</td>
+                                <td class="p-3">Spring MVC Framework</td>
+                            </tr>
+                            <tr class="hover:bg-slate-850">
+                                <td class="p-3 font-semibold text-slate-400 border-r border-slate-800">Execution Location</td>
+                                <td class="p-3 border-r border-slate-800">Outside Spring, before DispatcherServlet</td>
+                                <td class="p-3 border-r border-slate-800">Inside DelegatingFilterProxy, before DispatcherServlet</td>
+                                <td class="p-3">Inside DispatcherServlet processing</td>
+                            </tr>
+                            <tr class="hover:bg-slate-850">
+                                <td class="p-3 font-semibold text-slate-400 border-r border-slate-800">Execution Timing</td>
+                                <td class="p-3 border-r border-slate-800">First line of defense for raw HTTP requests</td>
+                                <td class="p-3 border-r border-slate-800">Before Spring MVC handles routing</td>
+                                <td class="p-3">After route matching, before/after Controller execution</td>
+                            </tr>
+                            <tr class="hover:bg-slate-850">
+                                <td class="p-3 font-semibold text-slate-400 border-r border-slate-800">Spring MVC Handler Access</td>
+                                <td class="p-3 border-r border-slate-800 text-red-400">No (Unaware of controllers/methods)</td>
+                                <td class="p-3 border-r border-slate-800 text-red-400">No (Unaware of controllers/methods)</td>
+                                <td class="p-3 text-emerald-400">Yes (Access to Object handler / MethodParameter)</td>
+                            </tr>
+                            <tr class="hover:bg-slate-850">
+                                <td class="p-3 font-semibold text-slate-400 border-r border-slate-800">Typical Use Cases</td>
+                                <td class="p-3 border-r border-slate-800">GZIP Compression, CORS, Low-level Logging</td>
+                                <td class="p-3 border-r border-slate-800">Authentication, Authorization, CSRF, Session Fixation</td>
+                                <td class="p-3">Execution timing, Theme resolution, Controller auditing</td>
+                            </tr>
+                            <tr class="hover:bg-slate-850">
+                                <td class="p-3 font-semibold text-slate-400 border-r border-slate-800">Example Interfaces / Classes</td>
+                                <td class="p-3 font-mono text-slate-400 border-r border-slate-800">jakarta.servlet.Filter</td>
+                                <td class="p-3 font-mono text-slate-400 border-r border-slate-800">OncePerRequestFilter</td>
+                                <td class="p-3 font-mono text-slate-400">HandlerInterceptor</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Table 2: DelegatingFilterProxy vs FilterChainProxy vs SecurityFilterChain -->
+                <div class="pt-6 border-t border-slate-800">
+                    <h3 class="text-base font-bold text-white mb-3">Spring Security Infrastructure Components</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 font-xs">
+                        <div class="bg-slate-950 p-4 rounded-lg border border-slate-800">
+                            <h4 class="font-bold text-spring-400 font-mono mb-2">DelegatingFilterProxy</h4>
+                            <p class="text-slate-300 text-xs leading-relaxed">A standard Servlet Filter registered with Tomcat. It bridges the gap between the Servlet Container's lifecycle and Spring's ApplicationContext by looking up and delegating to a Spring Bean (typically named <code class="text-spring-400">springSecurityFilterChain</code>).</p>
+                        </div>
+                        <div class="bg-slate-950 p-4 rounded-lg border border-slate-800">
+                            <h4 class="font-bold text-spring-400 font-mono mb-2">FilterChainProxy</h4>
+                            <p class="text-slate-300 text-xs leading-relaxed">The actual Spring Bean that receives requests from DelegatingFilterProxy. It contains a list of <code class="text-spring-400">SecurityFilterChain</code> beans and determines which chain matches the incoming request based on RequestMatcher rules.</p>
+                        </div>
+                        <div class="bg-slate-950 p-4 rounded-lg border border-slate-800">
+                            <h4 class="font-bold text-spring-400 font-mono mb-2">SecurityFilterChain</h4>
+                            <p class="text-slate-300 text-xs leading-relaxed">An interface defining a list of security filters (e.g. JwtAuthenticationFilter, AuthorizationFilter) that should be applied to matching URL patterns. Configured via <code class="text-spring-400">SecurityFilterChain</code> bean definition in Spring Boot 3.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 3: MULTIPLE SECURITY FILTER CHAINS -->
+        <section id="view-multichain" class="hidden space-y-6">
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-xl space-y-6">
+                <div>
+                    <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-code-branch text-spring-500"></i>
+                        Multiple SecurityFilterChain Matching Logic
+                    </h2>
+                    <p class="text-xs text-slate-400 mt-1">FilterChainProxy evaluates registered SecurityFilterChain instances sequentially based on order.</p>
+                </div>
+
+                <!-- Visual Multi-Chain Representation -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    
+                    <!-- Chain 1 -->
+                    <div class="bg-slate-950 border-2 border-spring-500/40 rounded-xl p-4 space-y-3 relative">
+                        <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                            <span class="text-xs font-bold text-spring-400 font-mono">Order(1) - API Chain</span>
+                            <span class="text-[10px] bg-spring-500/10 text-spring-400 border border-spring-500/30 px-2 py-0.5 rounded">URL: /api/**</span>
+                        </div>
+                        <div class="text-xs text-slate-300 space-y-1 font-mono">
+                            <p class="text-slate-400 text-[11px]">// Java Configuration</p>
+                            <p><span class="text-purple-400">@Bean</span></p>
+                            <p><span class="text-blue-400">@Order</span>(1)</p>
+                            <p><span class="text-blue-400">public</span> SecurityFilterChain apiChain(HttpSecurity http) {</p>
+                            <p class="pl-4">http.securityMatcher(<span class="text-emerald-300">"/api/**"</span>)</p>
+                            <p class="pl-8">.sessionManagement(s -> s.sessionCreationPolicy(STATELESS))</p>
+                            <p class="pl-8">.addFilterBefore(jwtFilter, ...);</p>
+                            <p>}</p>
+                        </div>
+                        <div class="bg-slate-900 p-2.5 rounded border border-slate-800 text-[11px] text-slate-300 space-y-1">
+                            <div class="font-semibold text-white">Active Security Filters:</div>
+                            <div class="flex items-center gap-2 text-xs text-slate-400"><i class="fa-solid fa-check text-spring-400"></i> CorsFilter</div>
+                            <div class="flex items-center gap-2 text-xs text-slate-400"><i class="fa-solid fa-check text-spring-400"></i> JwtAuthenticationFilter</div>
+                            <div class="flex items-center gap-2 text-xs text-slate-400"><i class="fa-solid fa-check text-spring-400"></i> AuthorizationFilter</div>
+                        </div>
+                    </div>
+
+                    <!-- Chain 2 -->
+                    <div class="bg-slate-950 border-2 border-amber-500/40 rounded-xl p-4 space-y-3 relative">
+                        <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                            <span class="text-xs font-bold text-amber-400 font-mono">Order(2) - Admin / Form Chain</span>
+                            <span class="text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded">URL: /admin/**</span>
+                        </div>
+                        <div class="text-xs text-slate-300 space-y-1 font-mono">
+                            <p class="text-slate-400 text-[11px]">// Java Configuration</p>
+                            <p><span class="text-purple-400">@Bean</span></p>
+                            <p><span class="text-blue-400">@Order</span>(2)</p>
+                            <p><span class="text-blue-400">public</span> SecurityFilterChain adminChain(HttpSecurity http) {</p>
+                            <p class="pl-4">http.securityMatcher(<span class="text-emerald-300">"/admin/**"</span>)</p>
+                            <p class="pl-8">.formLogin(Customizer.withDefaults());</p>
+                            <p>}</p>
+                        </div>
+                        <div class="bg-slate-900 p-2.5 rounded border border-slate-800 text-[11px] text-slate-300 space-y-1">
+                            <div class="font-semibold text-white">Active Security Filters:</div>
+                            <div class="flex items-center gap-2 text-xs text-slate-400"><i class="fa-solid fa-check text-amber-400"></i> UsernamePasswordAuthenticationFilter</div>
+                            <div class="flex items-center gap-2 text-xs text-slate-400"><i class="fa-solid fa-check text-amber-400"></i> DefaultLoginPageGeneratingFilter</div>
+                            <div class="flex items-center gap-2 text-xs text-slate-400"><i class="fa-solid fa-check text-amber-400"></i> AuthorizationFilter</div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Matcher Rules Note -->
+                <div class="bg-slate-950 border border-slate-800 p-4 rounded-lg text-xs text-slate-300 leading-relaxed space-y-2">
+                    <h4 class="font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-lightbulb text-amber-400"></i> Key Architectural Rule for Multiple Chains
+                    </h4>
+                    <p>When a request enters <code class="text-spring-400">FilterChainProxy</code>, it iterates through all registered <code class="text-spring-400">SecurityFilterChain</code> beans in ascending order of their <code class="text-spring-400">@Order</code> annotation. The <strong>first chain</strong> whose RequestMatcher returns <code class="text-emerald-400">true</code> handles the request exclusively. Subsequent chains are completely ignored.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 4: INTERVIEW Q&A & KNOWLEDGE QUIZ -->
+        <section id="view-quiz" class="hidden space-y-6">
+            
+            <!-- Interview Q&A Section -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-xl space-y-4">
+                <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-clipboard-question text-spring-500"></i>
+                    Top Spring Security Architectural Interview Q&A
+                </h2>
+
+                <div class="space-y-3 text-xs">
+                    <details class="bg-slate-950 border border-slate-800 rounded-lg p-3 group">
+                        <summary class="font-bold text-slate-200 cursor-pointer flex justify-between items-center group-open:text-spring-400">
+                            <span>Q1: How does Spring Security integrate with Servlet Container filters?</span>
+                            <i class="fa-solid fa-chevron-down text-slate-500 group-open:rotate-180 transition-transform"></i>
+                        </summary>
+                        <p class="mt-2 text-slate-300 leading-relaxed pl-2 border-l-2 border-spring-500">
+                            Servlet Containers (like Tomcat) do not know about Spring ApplicationContext or Spring Beans. Spring Security uses <code>DelegatingFilterProxy</code> (a standard Servlet filter registered in Tomcat) to bridge this gap. DelegatingFilterProxy delegates the incoming request to a Spring-managed Bean named <code>springSecurityFilterChain</code> (an instance of <code>FilterChainProxy</code>).
+                        </p>
+                    </details>
+
+                    <details class="bg-slate-950 border border-slate-800 rounded-lg p-3 group">
+                        <summary class="font-bold text-slate-200 cursor-pointer flex justify-between items-center group-open:text-spring-400">
+                            <span>Q2: What is the difference between a Servlet Filter and a Spring MVC Interceptor?</span>
+                            <i class="fa-solid fa-chevron-down text-slate-500 group-open:rotate-180 transition-transform"></i>
+                        </summary>
+                        <p class="mt-2 text-slate-300 leading-relaxed pl-2 border-l-2 border-spring-500">
+                            Servlet Filters belong to the Servlet container and execute before DispatcherServlet. They cannot access Spring MVC handler method details. Interceptors belong to Spring MVC, execute inside DispatcherServlet after request mapping, and have access to the target Controller method (<code>Object handler</code>) and Spring View objects.
+                        </p>
+                    </details>
+
+                    <details class="bg-slate-950 border border-slate-800 rounded-lg p-3 group">
+                        <summary class="font-bold text-slate-200 cursor-pointer flex justify-between items-center group-open:text-spring-400">
+                            <span>Q3: What happens if Authentication fails in a Spring Security filter?</span>
+                            <i class="fa-solid fa-chevron-down text-slate-500 group-open:rotate-180 transition-transform"></i>
+                        </summary>
+                        <p class="mt-2 text-slate-300 leading-relaxed pl-2 border-l-2 border-spring-500">
+                            If authentication fails (e.g. invalid JWT token), the filter throws an <code>AuthenticationException</code>. The <code>AuthenticationEntryPoint</code> handles this exception and directly writes an HTTP 401 response back to the client. The request chain is halted immediately, meaning DispatcherServlet, Interceptors, and Controllers are <strong>never reached</strong>.
+                        </p>
+                    </details>
+
+                    <details class="bg-slate-950 border border-slate-800 rounded-lg p-3 group">
+                        <summary class="font-bold text-slate-200 cursor-pointer flex justify-between items-center group-open:text-spring-400">
+                            <span>Q4: Where is the authenticated user stored in a stateless REST API?</span>
+                            <i class="fa-solid fa-chevron-down text-slate-500 group-open:rotate-180 transition-transform"></i>
+                        </summary>
+                        <p class="mt-2 text-slate-300 leading-relaxed pl-2 border-l-2 border-spring-500">
+                            In a stateless REST API (JWT based), an <code>Authentication</code> object is constructed on every request by the JWT filter and stored in the <code>SecurityContextHolder.getContext()</code> (typically backed by ThreadLocal). At the end of the request execution, the SecurityContext is cleared so no HTTP session state persists across requests.
+                        </p>
+                    </details>
+                </div>
+            </div>
+
+            <!-- Knowledge Quiz -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-xl space-y-6">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-vial-circle-check text-spring-500"></i>
+                            Spring Architecture Knowledge Quiz
+                        </h2>
+                        <p class="text-xs text-slate-400 mt-1">Test your understanding of request execution flow.</p>
+                    </div>
+                    <span id="quizScore" class="text-xs font-mono font-bold bg-spring-500/10 text-spring-400 px-3 py-1 rounded border border-spring-500/30">Score: 0 / 3</span>
+                </div>
+
+                <div class="space-y-6 text-xs" id="quizContainer">
+                    
+                    <!-- Question 1 -->
+                    <div class="bg-slate-950 p-4 rounded-lg border border-slate-800 space-y-3">
+                        <p class="font-bold text-white">1. Which component connects Tomcat's Servlet Filter infrastructure to Spring's ApplicationContext?</p>
+                        <div class="space-y-2">
+                            <label onclick="checkQuiz(1, 'a')" class="block p-2.5 rounded bg-slate-900 hover:bg-slate-850 cursor-pointer border border-slate-800 text-slate-300" id="q1-a">
+                                <input type="radio" name="q1" value="a" class="hidden"> A) DispatcherServlet
+                            </label>
+                            <label onclick="checkQuiz(1, 'b')" class="block p-2.5 rounded bg-slate-900 hover:bg-slate-850 cursor-pointer border border-slate-800 text-slate-300" id="q1-b">
+                                <input type="radio" name="q1" value="b" class="hidden"> B) DelegatingFilterProxy
+                            </label>
+                            <label onclick="checkQuiz(1, 'c')" class="block p-2.5 rounded bg-slate-900 hover:bg-slate-850 cursor-pointer border border-slate-800 text-slate-300" id="q1-c">
+                                <input type="radio" name="q1" value="c" class="hidden"> C) HandlerInterceptor
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Question 2 -->
+                    <div class="bg-slate-950 p-4 rounded-lg border border-slate-800 space-y-3">
+                        <p class="font-bold text-white">2. If an HTTP request fails AuthorizationFilter (403 Forbidden), does the Spring MVC Controller execute?</p>
+                        <div class="space-y-2">
+                            <label onclick="checkQuiz(2, 'a')" class="block p-2.5 rounded bg-slate-900 hover:bg-slate-850 cursor-pointer border border-slate-800 text-slate-300" id="q2-a">
+                                <input type="radio" name="q2" value="a" class="hidden"> A) Yes, controller executes and handles the error manually.
+                            </label>
+                            <label onclick="checkQuiz(2, 'b')" class="block p-2.5 rounded bg-slate-900 hover:bg-slate-850 cursor-pointer border border-slate-800 text-slate-300" id="q2-b">
+                                <input type="radio" name="q2" value="b" class="hidden"> B) No, execution stops at Spring Security filter level before reaching DispatcherServlet/Controller.
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Question 3 -->
+                    <div class="bg-slate-950 p-4 rounded-lg border border-slate-800 space-y-3">
+                        <p class="font-bold text-white">3. How does FilterChainProxy pick a SecurityFilterChain for an incoming request?</p>
+                        <div class="space-y-2">
+                            <label onclick="checkQuiz(3, 'a')" class="block p-2.5 rounded bg-slate-900 hover:bg-slate-850 cursor-pointer border border-slate-800 text-slate-300" id="q3-a">
+                                <input type="radio" name="q3" value="a" class="hidden"> A) It executes all configured SecurityFilterChains in parallel.
+                            </label>
+                            <label onclick="checkQuiz(3, 'b')" class="block p-2.5 rounded bg-slate-900 hover:bg-slate-850 cursor-pointer border border-slate-800 text-slate-300" id="q3-b">
+                                <input type="radio" name="q3" value="b" class="hidden"> B) It evaluates chains sequentially by @Order and picks the first matching RequestMatcher.
+                            </label>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-slate-900 border-t border-slate-800 py-4 mt-auto">
+        <div class="max-w-7xl mx-auto px-4 text-center text-xs text-slate-500">
+            Spring Security Architectural Execution Simulator &bull; Self-Contained Interactive Tool &bull; Spring Boot 3.x
+        </div>
+    </footer>
+
+    <!-- JavaScript Application Logic -->
+    <script>
+        // Global State Management
+        let currentScenario = 'jwt_success';
+        let currentStepIndex = 0;
+        let isPlaying = false;
+        let isAudioEnabled = false; // Audio Voice Sound feature toggle state
+        let animationTimer = null;
+        let animationSpeed = 1; // 1x = 2000ms per step
+        let quizAnswers = { 1: false, 2: false, 3: false };
+
+        // Speech Synthesis Narrator Support
+        const synth = window.speechSynthesis;
+
+        function speakText(text) {
+            if (!isAudioEnabled || !synth) return;
+            
+            // Cancel ongoing speech to ensure clear narration step-by-step
+            synth.cancel();
+
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.rate = 1.0 * animationSpeed; // Sync voice speed with animation playback speed
+            utterance.pitch = 1.0;
+
+            synth.speak(utterance);
+        }
+
+        function toggleAudio() {
+            isAudioEnabled = !isAudioEnabled;
+            const btn = document.getElementById('audioToggleBtn');
+            const icon = document.getElementById('audioIcon');
+            const text = document.getElementById('audioStatusText');
+
+            if (isAudioEnabled) {
+                btn.className = 'bg-spring-500/20 text-spring-400 border border-spring-500/40 p-2.5 rounded-lg transition flex items-center gap-1.5 font-medium text-xs';
+                icon.className = 'fa-solid fa-volume-high text-spring-400';
+                text.innerText = 'Voice ON';
+
+                // Speak current step immediately when turned on
+                const currentStep = scenarios[currentScenario].steps[currentStepIndex];
+                speakText(`${currentStep.title}. ${currentStep.desc}`);
+            } else {
+                btn.className = 'bg-slate-800 hover:bg-slate-700 text-slate-400 p-2.5 rounded-lg border border-slate-700 transition flex items-center gap-1.5 font-medium text-xs';
+                icon.className = 'fa-solid fa-volume-xmark text-slate-400';
+                text.innerText = 'Voice OFF';
+                
+                if (synth) synth.cancel();
+            }
+        }
+
+        // Component Detail Definitions for Inspector Sidebar
+        const componentDetails = {
+            'client': {
+                name: 'Client / Browser',
+                type: 'External Caller',
+                what: 'The client application (Web Browser, Mobile App, Postman) that constructs and sends an HTTP Request.',
+                why: 'Triggers the API or web page workflow with HTTP headers, request body, and credentials.',
+                where: 'Outside Application Infrastructure',
+                resp: 'Encodes parameters, attaches Auth tokens (Bearer JWT, Cookies) and initiates HTTP connections.',
+                prod: 'React App, iOS Native App, cURL script',
+                class: 'N/A (HTTP Protocol)'
+            },
+            'tomcat': {
+                name: 'Servlet Container (Embedded Tomcat)',
+                type: 'Infrastructure Container',
+                what: 'The underlying web server that hosts and manages the Servlet lifecycle (Servlet, Filter, Listener).',
+                why: 'Spring Boot packages Tomcat by default to listen on port 8080 and convert TCP packets into HTTP Servlet objects.',
+                where: 'Servlet Layer',
+                resp: 'Parses raw network bytes into HttpServletRequest & HttpServletResponse objects, manages socket worker threads.',
+                prod: 'org.apache.catalina.startup.Tomcat',
+                class: 'jakarta.servlet.ServletContainer'
+            },
+            'servlet-filters': {
+                name: 'Standard Servlet Filter Chain',
+                type: 'JavaEE/Jakarta Standard Filter',
+                what: 'Native Servlet filters registered directly with the Web Container.',
+                why: 'Handles low-level cross-cutting concerns like character encoding, request logging, or CORS headers before Spring processes the request.',
+                where: 'Servlet Container (Pre-Spring Context)',
+                resp: 'Intercepts every incoming request before reaching any Servlet.',
+                prod: 'CharacterEncodingFilter, CorsFilter',
+                class: 'jakarta.servlet.Filter'
+            },
+            'delegating-proxy': {
+                name: 'DelegatingFilterProxy',
+                type: 'Bridge Component',
+                what: 'A standard Servlet Filter that delegates its doFilter() call to a Spring-managed Bean.',
+                why: 'Servlet Containers don\'t recognize Spring Beans directly. DelegatingFilterProxy acts as a proxy bridge.',
+                where: 'Registered in Servlet Container, delegates to Spring ApplicationContext',
+                resp: 'Looks up the target Spring Bean (springSecurityFilterChain) lazily on the first request and passes execution.',
+                prod: 'org.springframework.web.filter.DelegatingFilterProxy',
+                class: 'DelegatingFilterProxy.java'
+            },
+            'filter-chain-proxy': {
+                name: 'FilterChainProxy (springSecurityFilterChain)',
+                type: 'Spring Security Central Router',
+                what: 'The master Spring Bean that manages all SecurityFilterChain instances.',
+                why: 'Acts as the central entry point for Spring Security, determining which SecurityFilterChain applies to a given URL matcher.',
+                where: 'Spring ApplicationContext',
+                resp: 'Iterates registered SecurityFilterChain beans by order, selects matching chain, and executes security filters.',
+                prod: 'org.springframework.security.web.FilterChainProxy',
+                class: 'FilterChainProxy.java'
+            },
+            'security-filter-chain': {
+                name: 'SecurityFilterChain Container',
+                type: 'Security Specification',
+                what: 'A container object holding an ordered list of Spring Security filters applicable to a URL pattern.',
+                why: 'Allows modular security configuration for different API zones (e.g. /api/** vs /admin/**).',
+                where: 'Spring Security Subsystem',
+                resp: 'Defines request matching rules and holds the specific filters (JWT, Authorization, Login filters).',
+                prod: 'DefaultSecurityFilterChain',
+                class: 'org.springframework.security.web.SecurityFilterChain'
+            },
+            'jwt-filter': {
+                name: 'JWT Authentication Filter',
+                type: 'Custom Security Filter',
+                what: 'A custom filter extending OncePerRequestFilter that parses Bearer JWT headers.',
+                why: 'Validates stateless JSON Web Tokens without hitting session storage or database on every request.',
+                where: 'Inside SecurityFilterChain',
+                resp: 'Extracts token from Authorization header, validates signature/expiration, creates Authentication token, and sets SecurityContextHolder.',
+                prod: 'JwtAuthenticationFilter extends OncePerRequestFilter',
+                class: 'org.springframework.web.filter.OncePerRequestFilter'
+            },
+            'form-filter': {
+                name: 'UsernamePasswordAuthenticationFilter',
+                type: 'Standard Spring Security Filter',
+                what: 'Filter that processes HTML Form POST requests (default endpoint /login).',
+                why: 'Handles traditional session-based username and password authentication.',
+                where: 'Inside SecurityFilterChain',
+                resp: 'Extracts username/password, creates UsernamePasswordAuthenticationToken, delegates validation to AuthenticationManager.',
+                prod: 'UsernamePasswordAuthenticationFilter',
+                class: 'org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter'
+            },
+            'authz-filter': {
+                name: 'AuthorizationFilter',
+                type: 'Access Control Filter',
+                what: 'The core filter that enforces access control rules (roles/authorities) on endpoints.',
+                why: 'Ensures authenticated users have required permissions (e.g. HAS_ROLE(\'ADMIN\')).',
+                where: 'End of SecurityFilterChain',
+                resp: 'Retrieves current Authentication from SecurityContext, checks authorities against AuthorizationManager/AccessDecisionManager. Throws AccessDeniedException if unauthorized.',
+                prod: 'AuthorizationFilter (Spring Security 6+)',
+                class: 'org.springframework.security.web.access.intercept.AuthorizationFilter'
+            },
+            'dispatcher-servlet': {
+                name: 'DispatcherServlet',
+                type: 'Spring MVC Front Controller',
+                what: 'The central servlet in Spring MVC that dispatches requests to handler methods.',
+                why: 'Eliminates boilerplate servlet configuration by routing URLs to @Controller methods dynamically.',
+                where: 'Spring MVC Layer',
+                resp: 'Maps URL to HandlerMethod, invokes HandlerInterceptors, executes Controller, resolves views/JSON responses.',
+                prod: 'org.springframework.web.servlet.DispatcherServlet',
+                class: 'DispatcherServlet.java'
+            },
+            'interceptor': {
+                name: 'Spring MVC Interceptor (HandlerInterceptor)',
+                type: 'MVC Interceptor',
+                what: 'An interceptor provided by Spring MVC that wraps around Controller handler execution.',
+                why: 'Used for web-specific concerns like locale resolution, view themes, or logging controller execution time.',
+                where: 'Inside DispatcherServlet',
+                resp: 'Executes preHandle() before Controller, postHandle() after Controller execution, and afterCompletion() after view rendering.',
+                prod: 'CustomLoggingInterceptor implements HandlerInterceptor',
+                class: 'org.springframework.web.servlet.HandlerInterceptor'
+            },
+            'controller': {
+                name: 'REST Controller (@RestController)',
+                type: 'Application Presentation Component',
+                what: 'Annotated Spring component that handles incoming REST request payloads.',
+                why: 'Exposes application domain logic via HTTP endpoints.',
+                where: 'Application Business Layer',
+                resp: 'Validates DTO inputs, calls Service methods, returns response DTOs serialized as JSON.',
+                prod: '@RestController @RequestMapping("/api/orders")',
+                class: 'OrderController.java'
+            },
+            'service': {
+                name: 'Service Layer (@Service)',
+                type: 'Business Logic Component',
+                what: 'Encapsulates domain logic and transaction boundaries.',
+                why: 'Keeps Controllers lean and reuses core business rules.',
+                where: 'Core Application Layer',
+                resp: 'Executes business rules, orchestrates operations across multiple repositories, handles @Transactional boundaries.',
+                prod: '@Service OrderService',
+                class: 'OrderServiceImpl.java'
+            },
+            'repository': {
+                name: 'Repository Layer (@Repository / Spring Data JPA)',
+                type: 'Data Access Layer',
+                what: 'Provides abstraction over database queries and persistence operations.',
+                why: 'Decouples application code from SQL syntax and ORM execution.',
+                where: 'Data Persistence Layer',
+                resp: 'Executes database queries, maps SQL rows to Java Entities.',
+                prod: 'OrderRepository extends JpaRepository<Order, Long>',
+                class: 'OrderRepository.java'
+            },
+            'database': {
+                name: 'Database (RDBMS)',
+                type: 'Data Storage',
+                what: 'Relational or NoSQL persistence engine storing application state.',
+                why: 'Provides persistent, ACID-compliant storage.',
+                where: 'Persistence Infrastructure',
+                resp: 'Stores tables, indexes, performs disk I/O, returns SQL result sets.',
+                prod: 'PostgreSQL / MySQL / Oracle',
+                class: 'N/A (Database Engine)'
+            }
+        };
+
+        // Execution Scenario Steps Definitions
+        const scenarios = {
+            'jwt_success': {
+                title: 'Scenario 1: Successful JWT Authentication (200 OK)',
+                steps: [
+                    { node: 'node-client', title: '1. Client Sends HTTP Request', desc: 'Client initiates GET /api/orders with header "Authorization: Bearer valid_jwt_token".', target: 'client' },
+                    { node: 'node-tomcat', title: '2. Tomcat Receives Request', desc: 'Tomcat Servlet Container receives network request, wraps it into HttpServletRequest.', target: 'tomcat' },
+                    { node: 'node-servlet-filters', title: '3. Servlet Filter Chain Executes', desc: 'Standard filters (CorsFilter, EncodingFilter) execute.', target: 'servlet-filters' },
+                    { node: 'node-delegating-proxy', title: '4. DelegatingFilterProxy Bridge', desc: 'DelegatingFilterProxy intercepts request and delegates to Spring-managed springSecurityFilterChain bean.', target: 'delegating-proxy' },
+                    { node: 'node-filter-chain-proxy', title: '5. FilterChainProxy Matches Route', desc: 'FilterChainProxy evaluates SecurityFilterChain beans and selects matching API chain for /api/**.', target: 'filter-chain-proxy' },
+                    { node: 'node-jwt-filter', title: '6. JWT Filter Extracts Token', desc: 'JwtAuthenticationFilter extracts "Bearer valid_jwt_token" from Authorization header.', target: 'jwt-filter' },
+                    { node: 'node-jwt-filter', title: '7. JWT Signature & Expiration Validated', desc: 'Filter verifies cryptographic signature with secret key and checks expiration time.', target: 'jwt-filter' },
+                    { node: 'node-security-chain', title: '8. SecurityContext Populated', desc: 'Valid token! Authentication object is stored in SecurityContextHolder.getContext().', target: 'security-filter-chain' },
+                    { node: 'node-authz-filter', title: '9. AuthorizationFilter Checks Access', desc: 'AuthorizationFilter verifies SecurityContext user has required role (e.g., ROLE_USER). Access granted.', target: 'authz-filter' },
+                    { node: 'node-dispatcher-servlet', title: '10. Request Reaches DispatcherServlet', desc: 'Spring Security filter chain completes. Request enters Spring MVC DispatcherServlet.', target: 'dispatcher-servlet' },
+                    { node: 'node-interceptor', title: '11. Spring MVC Interceptor preHandle()', desc: 'HandlerInterceptor preHandle() executes before controller method execution.', target: 'interceptor' },
+                    { node: 'node-controller', title: '12. Controller Method Invoked', desc: '@RestController OrderController.getOrders() receives request payload.', target: 'controller' },
+                    { node: 'node-service', title: '13. Service Layer Business Logic', desc: 'OrderService executes transaction and business rules.', target: 'service' },
+                    { node: 'node-repository', title: '14. Repository JPA Query', desc: 'OrderRepository constructs SQL query.', target: 'repository' },
+                    { node: 'node-database', title: '15. Database Execution', desc: 'Database executes SQL and returns order records.', target: 'database' },
+                    { node: 'node-controller', title: '16. Controller Returns JSON Response', desc: 'Service and Controller serialize order data into JSON DTO response.', target: 'controller' },
+                    { node: 'node-client', title: '17. HTTP 200 OK Delivered to Client', desc: 'Response travels back through filter chain to client browser with status HTTP 200 OK.', target: 'client' }
+                ]
+            },
+            'jwt_auth_fail': {
+                title: 'Scenario 2: Invalid JWT Token (401 Unauthorized)',
+                steps: [
+                    { node: 'node-client', title: '1. Client Sends Request with Invalid Token', desc: 'Client sends GET /api/orders with "Authorization: Bearer EXPIRED_OR_TAMPERED_TOKEN".', target: 'client' },
+                    { node: 'node-tomcat', title: '2. Tomcat Receives Request', desc: 'Tomcat constructs HttpServletRequest.', target: 'tomcat' },
+                    { node: 'node-servlet-filters', title: '3. Servlet Filter Execution', desc: 'Standard Servlet filters execute.', target: 'servlet-filters' },
+                    { node: 'node-delegating-proxy', title: '4. DelegatingFilterProxy Bridge', desc: 'Delegated to Spring Security filter infrastructure.', target: 'delegating-proxy' },
+                    { node: 'node-filter-chain-proxy', title: '5. FilterChainProxy Selects Security Chain', desc: 'FilterChainProxy routes request into API SecurityFilterChain.', target: 'filter-chain-proxy' },
+                    { node: 'node-jwt-filter', title: '6. JWT Filter Extracts Token', desc: 'JwtAuthenticationFilter reads token from request header.', target: 'jwt-filter' },
+                    { node: 'node-jwt-filter', title: '7. TOKEN VALIDATION FAILS! [ERROR]', desc: 'Signature invalid or token expired! Filter throws BadCredentialsException.', isError: true, target: 'jwt-filter' },
+                    { node: 'node-security-chain', title: '8. AuthenticationEntryPoint Triggers 401', desc: 'SecurityContext remains unauthenticated. AuthenticationEntryPoint writes HTTP 401 response immediately.', isError: true, target: 'security-filter-chain' },
+                    { node: 'node-client', title: '9. HTTP 401 Returned (Flow Halted!)', desc: 'HTTP 401 Unauthorized returned to client. DispatcherServlet, Interceptor, and Controllers are NEVER reached!', isError: true, target: 'client' }
+                ]
+            },
+            'jwt_authz_fail': {
+                title: 'Scenario 3: Role Authorization Failure (403 Forbidden)',
+                steps: [
+                    { node: 'node-client', title: '1. Client Requests Admin Endpoint', desc: 'Client (Role: USER) sends GET /api/admin/users with valid JWT.', target: 'client' },
+                    { node: 'node-tomcat', title: '2. Tomcat Processing', desc: 'Tomcat processes incoming HTTP request.', target: 'tomcat' },
+                    { node: 'node-delegating-proxy', title: '3. DelegatingFilterProxy', desc: 'Delegates request to FilterChainProxy.', target: 'delegating-proxy' },
+                    { node: 'node-jwt-filter', title: '4. JWT Auth Succeeds', desc: 'JWT signature valid! SecurityContext populated with user "john_doe" (ROLE_USER).', target: 'jwt-filter' },
+                    { node: 'node-authz-filter', title: '5. AuthorizationFilter Checks Permissions', desc: 'AuthorizationFilter compares required role (ADMIN) with authenticated user roles (USER).', target: 'authz-filter' },
+                    { node: 'node-authz-filter', title: '6. AUTHORIZATION DENIED! [403]', desc: 'User does NOT have ROLE_ADMIN! AccessDeniedException thrown.', isError: true, target: 'authz-filter' },
+                    { node: 'node-client', title: '7. HTTP 403 Forbidden Returned', desc: 'AccessDeniedHandler intercept writing HTTP 403 Forbidden response. Controller is NEVER executed.', isError: true, target: 'client' }
+                ]
+            },
+            'form_login': {
+                title: 'Scenario 4: Form Login Flow (POST /login)',
+                steps: [
+                    { node: 'node-client', title: '1. Client Submits Login Form', desc: 'Client submits POST /login with form parameters username=admin&password=secret.', target: 'client' },
+                    { node: 'node-tomcat', title: '2. Tomcat Servlet Processing', desc: 'Tomcat wraps form payload into HttpServletRequest.', target: 'tomcat' },
+                    { node: 'node-delegating-proxy', title: '3. DelegatingFilterProxy', desc: 'Delegates to Spring Security filter chain.', target: 'delegating-proxy' },
+                    { node: 'node-form-filter', title: '4. UsernamePasswordAuthenticationFilter', desc: 'Filter intercepts POST /login, extracts credentials, and creates UsernamePasswordAuthenticationToken.', target: 'form-filter' },
+                    { node: 'node-form-filter', title: '5. AuthenticationManager Invoked', desc: 'Filter passes unauthenticated token to ProviderManager (AuthenticationManager implementation).', target: 'form-filter' },
+                    { node: 'node-form-filter', title: '6. DaoAuthenticationProvider Executed', desc: 'AuthenticationProvider calls UserDetailsService.loadUserByUsername("admin").', target: 'form-filter' },
+                    { node: 'node-form-filter', title: '7. PasswordEncoder Verification', desc: 'PasswordEncoder matches raw password against BCrypt hashed password from database.', target: 'form-filter' },
+                    { node: 'node-security-chain', title: '8. Authentication Successful & Context Stored', desc: 'Fully authenticated Principal created and stored in SecurityContext & HttpSession.', target: 'security-filter-chain' },
+                    { node: 'node-client', title: '9. Session Cookie / Success Redirect', desc: 'AuthenticationSuccessHandler returns HTTP 200 or 302 Redirect with JSESSIONID cookie.', target: 'client' }
+                ]
+            }
+        };
+
+        // UI Tab Switcher
+        function switchTab(tabId) {
+            ['simulator', 'comparisons', 'multichain', 'quiz'].forEach(id => {
+                document.getElementById(`view-${id}`).classList.add('hidden');
+                document.getElementById(`tab-${id}`).classList.remove('active');
+            });
+            document.getElementById(`view-${tabId}`).classList.remove('hidden');
+            document.getElementById(`tab-${tabId}`).classList.add('active');
+        }
+
+        // Initialize Inspector Sidebar Component Details
+        function selectComponent(compKey) {
+            const detail = componentDetails[compKey];
+            if (!detail) return;
+
+            const inspector = document.getElementById('inspectorContent');
+            inspector.innerHTML = `
+                <div class="space-y-3">
+                    <div>
+                        <span class="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-spring-500/10 text-spring-400 border border-spring-500/30">${detail.type}</span>
+                        <h3 class="text-base font-bold text-white mt-1">${detail.name}</h3>
+                    </div>
+
+                    <div>
+                        <h4 class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">What it is</h4>
+                        <p class="text-slate-200 mt-0.5">${detail.what}</p>
+                    </div>
+
+                    <div>
+                        <h4 class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Why it exists</h4>
+                        <p class="text-slate-300 mt-0.5">${detail.why}</p>
+                    </div>
+
+                    <div>
+                        <h4 class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Execution Location</h4>
+                        <p class="text-slate-300 font-mono mt-0.5 text-[11px]">${detail.where}</p>
+                    </div>
+
+                    <div>
+                        <h4 class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Primary Responsibility</h4>
+                        <p class="text-slate-300 mt-0.5">${detail.resp}</p>
+                    </div>
+
+                    <div class="bg-slate-950 p-2.5 rounded border border-slate-800">
+                        <h4 class="text-[10px] font-bold text-spring-400 uppercase font-mono">Spring Class / Interface</h4>
+                        <p class="text-slate-200 font-mono text-[11px] mt-0.5 break-all">${detail.class}</p>
+                    </div>
+
+                    <div class="bg-slate-950 p-2.5 rounded border border-slate-800">
+                        <h4 class="text-[10px] font-bold text-slate-400 uppercase font-mono">Real-World Production Example</h4>
+                        <p class="text-slate-300 text-[11px] mt-0.5">${detail.prod}</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Execution Scenario Handler
+        function changeScenario() {
+            pauseAnimation();
+            currentScenario = document.getElementById('scenarioSelect').value;
+            currentStepIndex = 0;
+            updateStepView();
+        }
+
+        function updateStepView() {
+            const scenarioData = scenarios[currentScenario];
+            const currentStep = scenarioData.steps[currentStepIndex];
+
+            // Reset all active node classes
+            document.querySelectorAll('.arch-node').forEach(node => {
+                node.classList.remove('node-active', 'node-active-error');
+            });
+
+            // Highlight target node
+            const activeNode = document.getElementById(currentStep.node);
+            if (activeNode) {
+                if (currentStep.isError) {
+                    activeNode.classList.add('node-active-error');
+                } else {
+                    activeNode.classList.add('node-active');
+                }
+            }
+
+            // Update Progress Header
+            document.getElementById('scenarioTag').innerText = scenarioData.title;
+            document.getElementById('stepCounter').innerText = `Step ${currentStepIndex + 1} of ${scenarioData.steps.length}`;
+            const progressPct = ((currentStepIndex + 1) / scenarioData.steps.length) * 100;
+            document.getElementById('progressBar').style.width = `${progressPct}%`;
+
+            // Update Step Description Box
+            document.getElementById('stepTitle').innerText = currentStep.title;
+            document.getElementById('stepDescription').innerText = currentStep.desc;
+
+            // Status Icon Indicator
+            const iconBox = document.getElementById('stepStatusIcon');
+            if (currentStep.isError) {
+                iconBox.className = 'mt-0.5 text-red-400 text-lg';
+                iconBox.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>';
+            } else {
+                iconBox.className = 'mt-0.5 text-spring-400 text-lg';
+                iconBox.innerHTML = '<i class="fa-solid fa-circle-check"></i>';
+            }
+
+            // Auto-select component in inspector
+            if (currentStep.target) {
+                selectComponent(currentStep.target);
+            }
+
+            // Move animated packet visually
+            positionPacket(activeNode);
+
+            // Trigger Voice Narration if Voice Sound is Enabled
+            speakText(`${currentStep.title}. ${currentStep.desc}`);
+        }
+
+        // Animate Request Packet to target element position
+        function positionPacket(targetNode) {
+            const packet = document.getElementById('requestPacket');
+            const container = document.getElementById('diagramContainer');
+
+            if (!targetNode || !container) {
+                packet.classList.add('hidden');
+                return;
+            }
+
+            const containerRect = container.getBoundingClientRect();
+            const nodeRect = targetNode.getBoundingClientRect();
+
+            const topPos = (nodeRect.top - containerRect.top) + (nodeRect.height / 2) - 12;
+            const leftPos = (nodeRect.left - containerRect.left) + (nodeRect.width / 2) - 12;
+
+            packet.style.top = `${topPos}px`;
+            packet.style.left = `${leftPos}px`;
+            packet.classList.remove('hidden');
+        }
+
+        // Animation Playback Controls
+        function togglePlayPause() {
+            if (isPlaying) {
+                pauseAnimation();
+            } else {
+                playAnimation();
+            }
+        }
+
+        function playAnimation() {
+            isPlaying = true;
+            document.getElementById('playIcon').className = 'fa-solid fa-pause';
+            document.getElementById('playBtnText').innerText = 'Pause';
+
+            const stepDuration = 2200 / animationSpeed;
+            
+            function stepLoop() {
+                const scenarioData = scenarios[currentScenario];
+                if (currentStepIndex < scenarioData.steps.length - 1) {
+                    currentStepIndex++;
+                    updateStepView();
+                    animationTimer = setTimeout(stepLoop, stepDuration);
+                } else {
+                    pauseAnimation();
+                }
+            }
+
+            animationTimer = setTimeout(stepLoop, stepDuration);
+        }
+
+        function pauseAnimation() {
+            isPlaying = false;
+            if (animationTimer) clearTimeout(animationTimer);
+            document.getElementById('playIcon').className = 'fa-solid fa-play';
+            document.getElementById('playBtnText').innerText = 'Play Flow';
+            if (synth) synth.cancel();
+        }
+
+        function restartAnimation() {
+            pauseAnimation();
+            currentStepIndex = 0;
+            updateStepView();
+        }
+
+        function nextStep() {
+            pauseAnimation();
+            const scenarioData = scenarios[currentScenario];
+            if (currentStepIndex < scenarioData.steps.length - 1) {
+                currentStepIndex++;
+                updateStepView();
+            }
+        }
+
+        function prevStep() {
+            pauseAnimation();
+            if (currentStepIndex > 0) {
+                currentStepIndex--;
+                updateStepView();
+            }
+        }
+
+        function setSpeed(speed) {
+            animationSpeed = speed;
+            [0.5, 1, 2].forEach(s => {
+                const btn = document.getElementById(`speed-${s}`);
+                if (s === speed) {
+                    btn.className = 'speed-btn px-2.5 py-1 rounded bg-spring-500/20 text-spring-400 border border-spring-500/40';
+                } else {
+                    btn.className = 'speed-btn px-2.5 py-1 rounded bg-slate-800 border border-slate-700 hover:text-white';
+                }
+            });
+            if (isPlaying) {
+                pauseAnimation();
+                playAnimation();
+            }
+        }
+
+        // Quiz Checker Logic
+        function checkQuiz(qNum, selectedOption) {
+            const correctAnswers = { 1: 'b', 2: 'b', 3: 'b' };
+            const isCorrect = selectedOption === correctAnswers[qNum];
+            
+            const btn = document.getElementById(`q${qNum}-${selectedOption}`);
+            if (isCorrect) {
+                btn.classList.add('bg-emerald-500/20', 'border-emerald-500', 'text-emerald-300');
+                quizAnswers[qNum] = true;
+            } else {
+                btn.classList.add('bg-red-500/20', 'border-red-500', 'text-red-300');
+                quizAnswers[qNum] = false;
+            }
+
+            // Update Score
+            const score = Object.values(quizAnswers).filter(Boolean).length;
+            document.getElementById('quizScore').innerText = `Score: ${score} / 3`;
+        }
+
+        // Window Initializer
+        window.onload = function() {
+            updateStepView();
+            selectComponent('tomcat');
+            
+            // Adjust packet on window resize
+            window.addEventListener('resize', () => {
+                const scenarioData = scenarios[currentScenario];
+                const currentStep = scenarioData.steps[currentStepIndex];
+                const activeNode = document.getElementById(currentStep.node);
+                if (activeNode) positionPacket(activeNode);
+            });
+        };
+    </script>
+</body>
+</html>
