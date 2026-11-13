@@ -3520,3 +3520,1737 @@ The important RabbitMQ flow is:
 For production systems, understanding message delivery, acknowledgement, retry, DLQ, idempotency, publisher confirms and the Transactional Outbox Pattern is equally important.
 
 Start with a simple publisher and consumer implementation, then gradually add production reliability features.
+
+# Apache Kafka – Complete Reference Notes
+
+## 1. What is Kafka?
+
+Apache Kafka is a **distributed event streaming platform** used to publish, store, and consume events between multiple applications or microservices.
+
+It helps services communicate asynchronously without directly depending on each other.
+
+**Example: E-commerce application**
+
+When a customer places an order:
+
+1. Order Service creates an order.
+2. Order Service publishes an `OrderCreated` event to Kafka.
+3. Inventory Service consumes the event and updates stock.
+4. Payment Service consumes the event and processes payment.
+5. Notification Service consumes the event and sends an email.
+
+The Order Service does not need to know which services are consuming its event.
+
+**Main benefits:**
+- Loose coupling between microservices.
+- Asynchronous communication.
+- High throughput.
+- Scalability.
+- Fault tolerance.
+- Event replay.
+- Multiple consumers can independently process the same event.
+
+---
+
+## 2. Event Streaming vs Message Queue
+
+### Message Queue
+
+A message queue generally follows a point-to-point communication model.
+
+- Producer sends a message to a queue.
+- Consumer receives the message.
+- Once successfully acknowledged, the message is generally removed from the queue.
+- Another competing consumer does not normally receive that same message.
+
+Example: RabbitMQ work queue.
+
+### Event Streaming
+
+Event streaming stores events in an ordered, persistent log.
+
+- Producer publishes an event.
+- Kafka stores the event in a topic partition.
+- Multiple consumer groups can independently consume the same event.
+- Consuming an event does not delete it.
+- Events remain available according to the retention configuration.
+
+Example: Kafka.
+
+### Important difference
+
+| Feature | Message Queue | Event Streaming |
+|---|---|---|
+| Communication | Point-to-point / Pub-Sub | Event streaming |
+| Message storage | Usually until acknowledged | Based on retention policy |
+| Multiple consumers | Competing consumers share messages | Different groups independently read events |
+| Message replay | Depends on broker and configuration | Supported through offsets |
+| Ordering | Depends on queue and configuration | Guaranteed within a partition |
+| Consumer model | Commonly push-based | Poll-based |
+| Main purpose | Distribute tasks/messages | Store and distribute event streams |
+
+---
+
+## 3. RabbitMQ vs Kafka
+
+| Feature | RabbitMQ | Kafka |
+|---|---|---|
+| Type | Message broker | Distributed event streaming platform |
+| Architecture | Exchanges, queues, bindings | Topics, partitions, brokers |
+| Message consumption | Commonly push-based | Pull/poll-based |
+| Message deletion | Usually after acknowledgement | Based on retention policy |
+| Replay | Limited / plugin-dependent | Native offset-based replay |
+| Ordering | Queue-level ordering with configuration considerations | Partition-level ordering |
+| Throughput | Good for messaging workloads | Designed for high-throughput event streaming |
+| Routing | Powerful exchange-based routing | Topic and partition-based routing |
+| Consumer groups | Competing consumers and subscriptions | Native consumer groups |
+| Typical use | Task queues, RPC, background jobs | Event streaming, analytics, event-driven microservices |
+
+### When to use RabbitMQ?
+
+- Background job processing.
+- Email processing.
+- Task distribution.
+- Request/reply messaging.
+- Complex message routing.
+
+### When to use Kafka?
+
+- Communication between multiple microservices.
+- Event-driven architecture.
+- Real-time analytics.
+- High-volume event processing.
+- Event replay and audit history.
+- Multiple independent consumers.
+
+**Important:** Kafka and RabbitMQ are not direct replacements in every scenario. The choice depends on the application requirements.
+
+---
+
+## 4. What is a Kafka Broker?
+
+A broker is an individual Kafka server responsible for storing and managing topic partitions.
+
+A Kafka cluster contains multiple brokers.
+
+Example:
+
+```text
+Kafka Cluster
+     |
+     |---- Broker 1
+     |       |---- Orders Partition 0 (Leader)
+     |       |---- Payments Partition 1 (Follower)
+     |
+     |---- Broker 2
+     |       |---- Orders Partition 1 (Leader)
+     |       |---- Payments Partition 0 (Leader)
+     |
+     |---- Broker 3
+             |---- Orders Partition 2 (Leader)
+             |---- Payments Partition 1 (Leader)
+```
+
+Responsibilities of a broker:
+
+- Store partition data.
+- Handle producer requests.
+- Handle consumer fetch requests.
+- Manage partition replicas.
+- Participate in leader/follower replication.
+- Maintain metadata about the cluster.
+
+A broker is basically a Kafka server.
+
+---
+
+## 5. What is a Topic?
+
+A topic is a logical category or name under which related events are stored.
+
+Example:
+
+```text
+orders-topic
+payments-topic
+inventory-topic
+notification-topic
+```
+
+When an Order Service creates an order, it publishes an event to `orders-topic`.
+
+Example event:
+
+```json
+{
+  "orderId": 101,
+  "product": "Laptop",
+  "quantity": 2,
+  "status": "CREATED"
+}
+```
+
+A topic is not the actual event. It is the logical container in which events are organized.
+
+### Topic vs Event
+
+| Topic | Event |
+|---|---|
+| Logical category | Actual data/message |
+| Contains multiple events | Represents one occurrence |
+| Example: orders-topic | Example: OrderCreated |
+| Defined in Kafka | Published by producer |
+
+---
+
+## 6. What is a Partition?
+
+A partition is a physical/logical subdivision of a Kafka topic where events are stored in an ordered sequence.
+
+Kafka divides a topic into multiple partitions to achieve:
+
+- Parallel processing.
+- Scalability.
+- Distribution across brokers.
+- Higher throughput.
+
+Example:
+
+```text
+Topic: orders-topic
+
+Partition 0:
+Offset 0 -> Order 101
+Offset 1 -> Order 103
+Offset 2 -> Order 105
+
+Partition 1:
+Offset 0 -> Order 102
+Offset 1 -> Order 104
+
+Partition 2:
+Offset 0 -> Order 106
+Offset 1 -> Order 107
+```
+
+### Topic vs Partition
+
+| Topic | Partition |
+|---|---|
+| Logical category | Subdivision of a topic |
+| Contains multiple partitions | Contains ordered events |
+| Identified by topic name | Identified by topic and partition number |
+| Example: orders-topic | Partition 0, Partition 1 |
+
+A topic can contain one or multiple partitions.
+
+### Why do we need partitions?
+
+Suppose we have 100,000 events.
+
+If a topic has only one partition, processing parallelism is limited to one consumer per consumer group.
+
+If a topic has four partitions, up to four consumers in the same consumer group can process those partitions in parallel.
+
+---
+
+## 7. How to Add a Topic in Kafka
+
+Topics can be created manually using Kafka CLI or automatically through application configuration, depending on the setup.
+
+### Create a topic
+
+```bash
+kafka-topics.sh \
+--bootstrap-server localhost:9092 \
+--create \
+--topic orders-topic \
+--partitions 3 \
+--replication-factor 3
+```
+
+This creates a topic with:
+
+- Topic name: orders-topic
+- Partitions: 3
+- Replication factor: 3
+
+The replication factor cannot exceed the number of available brokers.
+
+### List topics
+
+```bash
+kafka-topics.sh \
+--bootstrap-server localhost:9092 \
+--list
+```
+
+### Describe a topic
+
+```bash
+kafka-topics.sh \
+--bootstrap-server localhost:9092 \
+--describe \
+--topic orders-topic
+```
+
+### Increase partition count
+
+```bash
+kafka-topics.sh \
+--bootstrap-server localhost:9092 \
+--alter \
+--topic orders-topic \
+--partitions 5
+```
+
+**Important:** Kafka allows increasing partitions but does not support reducing the partition count of an existing topic through the normal topic alteration command.
+
+Also, increasing partitions can change the key-to-partition mapping for future messages.
+
+---
+
+## 8. How Many Partitions Should a Topic Have?
+
+There is no fixed number.
+
+It depends on:
+
+- Number of consumers.
+- Expected throughput.
+- Message volume.
+- Processing time.
+- Available brokers.
+- Infrastructure resources.
+
+Example:
+
+If we have four consumers in one consumer group and want all four to process events in parallel, we need at least four partitions.
+
+A common starting point is to define a small number of partitions and increase them based on throughput and parallelism requirements.
+
+Do not create hundreds of partitions without considering resource and operational overhead.
+
+---
+
+## 9. How Does Kafka Decide Which Partition Receives an Event?
+
+Kafka producers decide the destination partition.
+
+Common approaches:
+
+**1. Key-based partitioning**
+
+```java
+kafkaTemplate.send("orders-topic", order.getOrderId(), order);
+```
+
+Kafka uses the key to determine the partition.
+
+Events with the same key normally go to the same partition, assuming the partition count and partitioning strategy remain unchanged.
+
+Example:
+
+```text
+Order ID 101 -> Partition 1
+Order ID 101 -> Partition 1
+Order ID 102 -> Partition 2
+Order ID 103 -> Partition 0
+```
+
+**2. No key**
+
+If no key is supplied, the producer uses its partitioning strategy to distribute records among partitions.
+
+**3. Explicit partition**
+
+A producer can directly specify the partition.
+
+---
+
+## 10. Ordering in Kafka
+
+Kafka guarantees ordering **within a single partition**, not across multiple partitions.
+
+Example:
+
+```text
+Partition 0:
+Offset 0 -> Order Created
+Offset 1 -> Order Paid
+Offset 2 -> Order Shipped
+```
+
+The events are read in partition order.
+
+However:
+
+```text
+Partition 0:
+Order Created
+
+Partition 1:
+Order Paid
+
+Partition 2:
+Order Shipped
+```
+
+There is no guaranteed ordering across these partitions.
+
+### Why?
+
+Each partition maintains its own independent ordered log.
+
+Kafka does not provide a global ordering guarantee across all partitions of a topic.
+
+### How to maintain order for an entity?
+
+Use a common key.
+
+Example:
+
+```java
+kafkaTemplate.send("orders-topic", orderId, orderEvent);
+```
+
+All events for the same order will normally go to the same partition.
+
+This helps preserve the order of events for that order.
+
+---
+
+## 11. What is a Consumer?
+
+A consumer is an application that reads events from Kafka topics.
+
+Example:
+
+Inventory Service consumes events from `orders-topic`.
+
+```java
+@KafkaListener(
+    topics = "orders-topic",
+    groupId = "inventory-service-group"
+)
+public void consume(OrderEvent event) {
+
+    System.out.println(event);
+}
+```
+
+The consumer receives the event and performs the required business operation.
+
+---
+
+## 12. What is a Consumer Group?
+
+A consumer group is a collection of consumers working together to consume events from one or more topics.
+
+Example:
+
+```text
+Topic: orders-topic
+Partitions: 3
+
+Consumer Group: inventory-service-group
+
+Consumer 1 -> Partition 0
+Consumer 2 -> Partition 1
+Consumer 3 -> Partition 2
+```
+
+Each partition is assigned to only one consumer within a particular consumer group at a time.
+
+### Important rules
+
+1. Multiple consumers can belong to one consumer group.
+2. Multiple consumers in the same group can consume different partitions.
+3. One partition cannot be actively assigned to multiple consumers in the same group at the same time.
+4. Multiple consumer groups can independently consume the same partition.
+5. If consumers exceed partitions, some consumers will remain idle.
+
+### Can multiple consumers consume the same partition?
+
+**Within the same consumer group:** No. A partition is assigned to only one consumer at a time.
+
+**Across different consumer groups:** Yes.
+
+Example:
+
+```text
+Topic: orders-topic
+Partition 0
+
+       |-------------------------|
+       |                         |
+Inventory Group             Payment Group
+       |                         |
+Consumer 1                 Consumer 1
+       |                         |
+Reads events               Reads same events
+```
+
+Both services can independently process the same event.
+
+### Important clarification
+
+A consumer should generally be configured with a consumer group ID when using Kafka's group management.
+
+A consumer can also read without a group using manual partition assignment, but this is a different consumption model.
+
+---
+
+## 13. Kafka Message Queue vs Consumer Group
+
+Consider RabbitMQ:
+
+```text
+Producer
+   |
+   v
+Queue
+   |
+   |---- Consumer 1
+   |---- Consumer 2
+   |---- Consumer 3
+```
+
+Consumers compete for messages. Normally, one successfully acknowledged message is not delivered to another competing consumer.
+
+Kafka:
+
+```text
+                 orders-topic
+                      |
+              Partition 0
+                      |
+          |-----------|-----------|
+          |           |           |
+       Group A     Group B     Group C
+          |           |           |
+       Consumer    Consumer    Consumer
+          1           1           1
+```
+
+Each group independently reads the events.
+
+Therefore, the same event can be processed by Inventory Service, Payment Service, and Notification Service.
+
+---
+
+## 14. What is an Offset?
+
+An offset is a sequential position number assigned to each record within a partition.
+
+Example:
+
+```text
+Partition 0:
+
+Offset 0 -> Order 101
+Offset 1 -> Order 102
+Offset 2 -> Order 103
+Offset 3 -> Order 104
+```
+
+The offset helps consumers track their reading position.
+
+Important:
+
+- Offset is unique within a partition, not across the entire topic.
+- Different partitions can have the same offset numbers.
+- Kafka assigns offsets when records are appended to a partition.
+
+### Who allocates the offset?
+
+The partition leader broker assigns offsets as records are appended to the partition log.
+
+### Where is the offset stored?
+
+There are two different concepts:
+
+**1. Record offset**
+
+The record's offset is stored as part of the partition log/index information.
+
+**2. Consumer committed offset**
+
+Kafka stores committed consumer offsets in an internal topic:
+
+```text
+__consumer_offsets
+```
+
+This topic stores consumer group progress.
+
+Example:
+
+```text
+Consumer Group: inventory-service-group
+
+Topic: orders-topic
+
+Partition 0 -> Committed Offset 10
+Partition 1 -> Committed Offset 15
+Partition 2 -> Committed Offset 8
+```
+
+This allows consumers to continue from their previously committed position after restarting.
+
+---
+
+## 15. How Long Does Kafka Store Events?
+
+Kafka stores events according to the topic's retention configuration.
+
+It does not delete an event immediately after a consumer reads it.
+
+Example:
+
+```text
+Retention Period: 7 days
+
+Day 1 -> Event published
+Day 2 -> Consumer reads event
+Day 3 -> Another consumer reads same event
+Day 7 -> Event becomes eligible for deletion
+```
+
+Kafka can delete older log segments based on retention policies.
+
+### Retention configurations
+
+**Time-based retention**
+
+```properties
+retention.ms=604800000
+```
+
+This represents seven days.
+
+**Size-based retention**
+
+```properties
+retention.bytes=1073741824
+```
+
+This represents approximately 1 GB per partition.
+
+**Log compaction**
+
+Kafka also supports log compaction, which retains the latest value for each key (subject to compaction and deletion rules).
+
+### Important
+
+Consumer consumption does not determine message deletion.
+
+Retention policy determines how long records remain available, subject to Kafka's cleanup process.
+
+---
+
+## 16. How Do Consumers Consume Events from Kafka?
+
+Kafka follows a pull-based model.
+
+It does not normally push each event to the consumer when a new event arrives.
+
+The consumer periodically requests records from Kafka using the poll mechanism.
+
+Flow:
+
+```text
+Producer
+   |
+   v
+Kafka Topic
+   |
+   v
+Consumer calls poll()
+   |
+   v
+Kafka returns available records
+   |
+   v
+Consumer processes records
+   |
+   v
+Consumer commits offset
+   |
+   v
+Consumer calls poll() again
+```
+
+### Example
+
+```java
+@KafkaListener(
+    topics = "orders-topic",
+    groupId = "inventory-service-group"
+)
+public void consume(OrderEvent event) {
+
+    System.out.println("Received: " + event);
+}
+```
+
+Spring Kafka manages the underlying polling loop and invokes the listener method when records are received.
+
+You do not need to manually call `poll()` when using `@KafkaListener`.
+
+---
+
+## 17. How Does Kafka Detect New Events?
+
+Kafka consumers continuously poll Kafka brokers.
+
+Example:
+
+```text
+10:00:00 -> Consumer polls Kafka
+10:00:01 -> No new events
+10:00:02 -> Producer publishes event
+10:00:03 -> Consumer polls Kafka
+10:00:03 -> Consumer receives event
+```
+
+Kafka can also use long polling, where the broker can wait briefly for data before responding.
+
+The consumer is responsible for requesting new records.
+
+---
+
+## 18. Offset Commit Strategies
+
+Committing an offset means recording the consumer's progress.
+
+Kafka supports different strategies.
+
+### 1. Auto Commit
+
+Kafka automatically commits offsets periodically.
+
+```properties
+enable.auto.commit=true
+auto.commit.interval.ms=5000
+```
+
+Advantages:
+- Simple configuration.
+- Less manual code.
+
+Disadvantages:
+- The offset might be committed before processing finishes.
+- If the consumer crashes, an event could be skipped.
+
+### 2. Manual Commit
+
+The application commits offsets after processing.
+
+```properties
+enable.auto.commit=false
+```
+
+With Spring Kafka, acknowledgment can be used:
+
+```java
+@KafkaListener(
+    topics = "orders-topic",
+    groupId = "inventory-service-group"
+)
+public void consume(
+    OrderEvent event,
+    Acknowledgment acknowledgment
+) {
+
+    processOrder(event);
+
+    acknowledgment.acknowledge();
+}
+```
+
+This example assumes an appropriate manual acknowledgment mode is configured.
+
+### Delivery Guarantees
+
+**At-most-once**
+
+- Event is committed before processing.
+- If processing fails, the event may be lost from the application's perspective.
+- No duplicate processing guarantee.
+
+**At-least-once**
+
+- Event is processed before its offset is committed.
+- If the application crashes before committing, the event may be processed again.
+- Duplicates are possible.
+
+**Exactly-once**
+
+Kafka supports exactly-once processing in supported transactional Kafka workflows.
+
+However, exactly-once processing across external databases, APIs, and other systems requires additional coordination or idempotency mechanisms.
+
+For most microservice applications, idempotent consumers are important.
+
+---
+
+## 19. How Kafka Handles Consumer Crashes?
+
+Suppose we have:
+
+```text
+Topic: orders-topic
+Partitions: 3
+
+Consumer 1 -> Partition 0
+Consumer 2 -> Partition 1
+Consumer 3 -> Partition 2
+```
+
+If Consumer 2 crashes:
+
+1. Kafka detects that the consumer is no longer participating in the group.
+2. A rebalance is triggered.
+3. Partition 1 is reassigned to another active consumer.
+4. The new consumer resumes from the committed offset.
+5. Uncommitted records may be processed again.
+
+Example:
+
+```text
+Before crash:
+
+Consumer 1 -> Partition 0
+Consumer 2 -> Partition 1
+Consumer 3 -> Partition 2
+
+After Consumer 2 crashes:
+
+Consumer 1 -> Partition 0, Partition 1
+Consumer 3 -> Partition 2
+```
+
+The actual reassignment depends on the group assignment strategy.
+
+**Important:** If a consumer crashes after processing an event but before committing its offset, the event can be processed again.
+
+---
+
+## 20. How Does Kafka Handle Wrong Events or Invalid Data?
+
+Kafka does not automatically understand whether an event is valid according to your application's business rules.
+
+For example:
+
+```json
+{
+  "orderId": null,
+  "quantity": -10
+}
+```
+
+The consumer application should validate the event.
+
+Common approaches:
+
+**1. Validation**
+
+Validate incoming events before business processing.
+
+**2. Retry**
+
+Retry temporary failures such as database connectivity issues.
+
+**3. Dead Letter Topic (DLT/DLQ)**
+
+Send permanently failed events to a separate topic.
+
+Example:
+
+```text
+orders-topic
+     |
+     v
+Inventory Consumer
+     |
+     v
+Processing Failed
+     |
+     v
+orders-dlt
+```
+
+**4. Logging and monitoring**
+
+Log the exception and track failed events.
+
+**Important:** Invalid JSON or deserialization failures can happen before your listener method is invoked. These require appropriate deserialization error handling.
+
+Do not retry permanent business validation failures indefinitely.
+
+---
+
+## 21. Kafka Is Not a Traditional Database; It Is a Distributed Log
+
+Kafka is not designed for traditional CRUD operations.
+
+In a relational database:
+
+- Create records.
+- Read records.
+- Update records.
+- Delete records.
+
+Kafka follows an append-oriented log model.
+
+- Producers append events.
+- Consumers read events.
+- Consumers track their offsets.
+- Records are cleaned up based on retention or compaction policies.
+
+Example:
+
+```text
+orders-topic
+
+Offset 0 -> Order Created
+Offset 1 -> Order Paid
+Offset 2 -> Order Shipped
+```
+
+If an order status changes, the application generally publishes another event instead of updating the earlier event in place.
+
+Example:
+
+```text
+OrderCreated
+OrderPaid
+OrderShipped
+```
+
+This makes Kafka useful for event-driven architectures and event history.
+
+---
+
+## 22. Partition Replication – Leader and Follower
+
+Kafka supports replication to provide fault tolerance.
+
+A partition can have:
+
+- One leader replica.
+- One or more follower replicas.
+
+Example:
+
+```text
+Topic: orders-topic
+Partition: 0
+Replication Factor: 3
+
+Broker 1 -> Leader
+Broker 2 -> Follower
+Broker 3 -> Follower
+```
+
+### Leader
+
+- Handles normal producer writes.
+- Handles consumer reads in the standard leader-based read path.
+- Coordinates replication for the partition.
+
+### Follower
+
+- Fetches records from the leader.
+- Maintains a replica of the partition.
+- Can become the leader if the existing leader fails and it is eligible.
+
+### What happens if the leader crashes?
+
+```text
+Before:
+
+Broker 1 -> Leader
+Broker 2 -> Follower
+Broker 3 -> Follower
+
+Broker 1 crashes.
+
+After:
+
+Broker 2 -> New Leader
+Broker 3 -> Follower
+```
+
+The Kafka controller manages leader election.
+
+### How Many Replicas Should We Keep?
+
+There is no fixed rule.
+
+A replication factor of 3 is a common production starting point.
+
+For example:
+
+```text
+Replication Factor = 3
+
+1 Leader + 2 Followers
+```
+
+This provides better fault tolerance than a single replica.
+
+The actual configuration depends on availability, infrastructure, and durability requirements.
+
+Replication factor cannot exceed the number of brokers.
+
+---
+
+## 23. How Does Kafka Know Which Broker Is the Leader?
+
+Kafka maintains cluster metadata.
+
+Metadata contains information such as:
+
+- Available brokers.
+- Topic names.
+- Partition information.
+- Partition leaders.
+- Replica assignments.
+- Controller information.
+
+The producer and consumer use metadata to identify the correct broker for a partition.
+
+Example:
+
+```text
+Topic: orders-topic
+
+Partition 0 -> Leader Broker 1
+Partition 1 -> Leader Broker 2
+Partition 2 -> Leader Broker 3
+```
+
+If a producer wants to publish an event to Partition 1, it uses metadata to identify Broker 2 as the leader.
+
+### What is the Kafka Controller?
+
+The controller manages important cluster-level operations, including:
+
+- Broker membership.
+- Partition leader election.
+- Replica state management.
+- Metadata changes.
+
+---
+
+## 24. KRaft vs ZooKeeper
+
+Kafka historically used ZooKeeper for cluster coordination and metadata management.
+
+Newer Kafka versions support KRaft (Kafka Raft).
+
+### ZooKeeper Architecture
+
+```text
+Kafka Cluster
+     |
+     v
+ZooKeeper
+     |
+     |---- Cluster Metadata
+     |---- Broker Registration
+     |---- Controller Coordination
+     |---- Leader Election Coordination
+```
+
+ZooKeeper was an external coordination system.
+
+### KRaft Architecture
+
+```text
+Kafka Cluster
+     |
+     v
+KRaft Controller Quorum
+     |
+     |---- Metadata Management
+     |---- Controller Election
+     |---- Cluster Coordination
+```
+
+KRaft uses Kafka's own metadata quorum based on the Raft consensus protocol.
+
+### KRaft vs ZooKeeper
+
+| Feature | ZooKeeper | KRaft |
+|---|---|---|
+| Coordination | External ZooKeeper | Built into Kafka |
+| Metadata | Managed through ZooKeeper | Managed by Kafka metadata quorum |
+| Consensus | ZooKeeper protocol | Raft-based consensus |
+| Infrastructure | Separate ZooKeeper cluster | No separate ZooKeeper cluster |
+| Architecture | More components | Simpler architecture |
+| Scalability | Older metadata architecture | Improved metadata scalability |
+
+**Important:** KRaft does not mean that every Kafka broker becomes a controller.
+
+Kafka can have dedicated controller nodes, broker nodes, or combined broker/controller nodes depending on deployment configuration.
+
+Modern Kafka deployments use KRaft. ZooKeeper mode has been deprecated and removed from modern Kafka releases.
+
+---
+
+## 25. What is Kafka Metadata?
+
+Kafka metadata is information describing the Kafka cluster and its structure.
+
+Example:
+
+```text
+Cluster
+  |
+  |---- Broker 1
+  |---- Broker 2
+  |---- Broker 3
+  |
+  |---- orders-topic
+  |       |---- Partition 0 -> Leader Broker 1
+  |       |---- Partition 1 -> Leader Broker 2
+  |
+  |---- payments-topic
+          |---- Partition 0 -> Leader Broker 3
+```
+
+Metadata works like a routing/reference map that helps clients locate partition leaders.
+
+It is not the actual business event data.
+
+---
+
+## 26. Complete End-to-End Kafka Flow
+
+Let's understand the complete flow using an e-commerce application.
+
+### Step 1: Producer creates an event
+
+Customer places an order.
+
+Order Service creates:
+
+```json
+{
+  "orderId": 101,
+  "product": "Laptop",
+  "quantity": 2,
+  "status": "CREATED"
+}
+```
+
+### Step 2: Producer publishes the event
+
+```java
+kafkaTemplate.send("orders-topic", orderId, orderEvent);
+```
+
+Producer responsibilities:
+
+- Create the event.
+- Serialize the event.
+- Select a partition.
+- Send the event to the partition leader.
+- Handle acknowledgments and retries according to configuration.
+
+### Step 3: Broker receives the event
+
+The partition leader:
+
+- Receives the event.
+- Appends it to the partition log.
+- Assigns an offset.
+- Replicates the record to followers according to replication settings.
+
+### Step 4: Consumer polls Kafka
+
+Inventory Service polls Kafka through its consumer.
+
+```java
+@KafkaListener(
+    topics = "orders-topic",
+    groupId = "inventory-service-group"
+)
+public void consume(OrderEvent event) {
+
+    System.out.println("Order received: " + event);
+}
+```
+
+### Step 5: Consumer processes the event
+
+Inventory Service updates the inventory database.
+
+### Step 6: Consumer commits the offset
+
+Kafka stores the consumer's committed progress in `__consumer_offsets`.
+
+### Step 7: Other consumer groups process the same event
+
+Payment Service and Notification Service independently consume the same event using different consumer groups.
+
+### Complete Architecture
+
+```text
+                  Customer
+                      |
+                      v
+                 Order Service
+                      |
+                      v
+                   Producer
+                      |
+                      v
+                Kafka Cluster
+                      |
+                 orders-topic
+                      |
+          +-----------+-----------+
+          |           |           |
+      Partition 0  Partition 1  Partition 2
+          |           |           |
+          +-----------+-----------+
+                      |
+          +-----------+-----------+
+          |           |           |
+     Inventory     Payment    Notification
+      Service      Service      Service
+          |           |           |
+       Group A      Group B      Group C
+          |           |           |
+       Database    Payment      Email
+```
+
+---
+
+## 27. How Many Consumers Can Consume a Topic?
+
+The number of active consumers in a single consumer group is limited by the number of partitions assigned to that group.
+
+Example:
+
+```text
+Topic: orders-topic
+Partitions: 3
+
+Consumer Group: inventory-group
+
+Consumer 1 -> Partition 0
+Consumer 2 -> Partition 1
+Consumer 3 -> Partition 2
+Consumer 4 -> Idle
+Consumer 5 -> Idle
+```
+
+Even though five consumers exist, only three can actively consume these three partitions in this group at a time.
+
+If we have another consumer group:
+
+```text
+Consumer Group: payment-group
+
+Consumer 1 -> Partition 0
+Consumer 2 -> Partition 1
+Consumer 3 -> Partition 2
+```
+
+This group independently consumes the same topic.
+
+---
+
+## 28. Adding a Consumer Group to an Existing Topic
+
+A consumer group does not need to be created manually before consuming.
+
+When a consumer connects with a new group ID, Kafka automatically establishes the group through group coordination.
+
+Example:
+
+```java
+@KafkaListener(
+    topics = "orders-topic",
+    groupId = "notification-service-group"
+)
+public void consume(OrderEvent event) {
+
+    sendNotification(event);
+}
+```
+
+Even if `orders-topic` already exists and is consumed by Inventory Service, Notification Service can independently consume it.
+
+Example:
+
+```text
+orders-topic
+     |
+     |---- inventory-service-group
+     |
+     |---- payment-service-group
+     |
+     |---- notification-service-group
+```
+
+Each group maintains its own committed offsets.
+
+---
+
+## 29. How Kafka Handles Huge Write Operations
+
+Kafka is designed for high-throughput event ingestion.
+
+Some important techniques:
+
+**1. Batching**
+
+The producer groups multiple records into batches instead of sending each record separately.
+
+```properties
+batch.size=16384
+linger.ms=5
+```
+
+**2. Compression**
+
+Kafka supports compression algorithms such as:
+
+- GZIP
+- Snappy
+- LZ4
+- Zstandard
+
+**3. Sequential disk writes**
+
+Kafka appends records to partition logs, which is efficient for sequential writes.
+
+**4. Partitioning**
+
+Multiple partitions allow writes to be distributed across brokers.
+
+**5. Replication**
+
+Follower replicas maintain copies of partition data for fault tolerance.
+
+**6. Zero-copy transfer**
+
+Kafka can use efficient transfer mechanisms to reduce unnecessary data copying when serving consumers.
+
+---
+
+## 30. What is Backpressure in Kafka?
+
+Backpressure occurs when consumers cannot process incoming events as quickly as producers publish them.
+
+Example:
+
+```text
+Producer:
+1000 events/second
+
+Consumer:
+500 events/second
+```
+
+The consumer cannot keep up.
+
+As a result, the consumer lag increases.
+
+### How to handle backpressure?
+
+- Increase the number of partitions where appropriate.
+- Add more consumers to the same consumer group.
+- Optimize consumer processing.
+- Batch database operations.
+- Avoid unnecessarily slow external API calls.
+- Apply controlled rate limiting.
+- Monitor consumer lag.
+
+Remember: Adding consumers alone does not increase parallelism beyond the available partition assignments.
+
+---
+
+## 31. What is Consumer Lag?
+
+Consumer lag indicates how far behind a consumer group is compared with the latest available records.
+
+Example:
+
+```text
+Current Consumer Offset = 100
+Log End Offset = 150
+
+Consumer Lag = 50
+```
+
+This means the consumer group is behind by approximately 50 records for that partition.
+
+Command:
+
+```bash
+kafka-consumer-groups.sh \
+--bootstrap-server localhost:9092 \
+--describe \
+--group inventory-service-group
+```
+
+Example output:
+
+```text
+GROUP                  TOPIC         PARTITION  CURRENT-OFFSET  LOG-END-OFFSET  LAG
+
+inventory-service     orders-topic  0          100             150             50
+```
+
+High lag can indicate:
+
+- Slow processing.
+- Insufficient consumers.
+- Insufficient partitions.
+- Database performance problems.
+- Consumer failures.
+
+---
+
+## 32. Pub-Sub vs Kafka Event-Driven Architecture
+
+### Traditional Pub-Sub
+
+In a traditional publish-subscribe system:
+
+```text
+Publisher
+    |
+    v
+Message Broker
+    |
+    +---- Subscriber 1
+    |
+    +---- Subscriber 2
+    |
+    +---- Subscriber 3
+```
+
+The publisher publishes a message, and subscribers receive it based on the messaging system's delivery and retention behavior.
+
+### Kafka Event-Driven Architecture
+
+```text
+Producer
+   |
+   v
+Kafka Topic
+   |
+   +---- Consumer Group A
+   |
+   +---- Consumer Group B
+   |
+   +---- Consumer Group C
+```
+
+Kafka provides durable event storage, offsets, independent consumer progress, partitioning, and replay.
+
+**Important:** Kafka itself also supports publish-subscribe patterns. Kafka is not an alternative to Pub-Sub; it is one platform used to implement event-driven Pub-Sub architectures.
+
+---
+
+## 33. Partitioning Across Multiple Topics
+
+Each topic maintains its own partitions.
+
+Example:
+
+```text
+orders-topic
+   |---- Partition 0
+   |---- Partition 1
+   |---- Partition 2
+
+payments-topic
+   |---- Partition 0
+   |---- Partition 1
+
+inventory-topic
+   |---- Partition 0
+   |---- Partition 1
+   |---- Partition 2
+```
+
+Partitions are distributed across available brokers.
+
+A broker can host partitions belonging to multiple topics.
+
+Partition IDs are local to their respective topics.
+
+For example:
+
+```text
+orders-topic -> Partition 0
+payments-topic -> Partition 0
+```
+
+These are two different partitions.
+
+---
+
+## 34. How Are New Topic Partitions Created?
+
+When creating a new topic, specify the partition count.
+
+Example:
+
+```bash
+kafka-topics.sh \
+--bootstrap-server localhost:9092 \
+--create \
+--topic payments-topic \
+--partitions 3 \
+--replication-factor 3
+```
+
+Kafka creates three partitions and distributes their replicas across eligible brokers.
+
+If a topic is created with only one partition, its parallelism is limited to one active consumer per group.
+
+You can increase the partition count later, but decreasing it is not supported through normal topic alteration.
+
+---
+
+## 35. Can a Consumer Consume Multiple Topics?
+
+Yes.
+
+A single consumer can subscribe to multiple topics.
+
+Example using Spring Kafka:
+
+```java
+@KafkaListener(
+    topics = {"orders-topic", "payments-topic"},
+    groupId = "application-service-group"
+)
+public void consume(Object event) {
+
+    System.out.println(event);
+}
+```
+
+However, if different topics contain different event structures, it is better to handle their types explicitly.
+
+You can also create separate listeners:
+
+```java
+@KafkaListener(
+    topics = "orders-topic",
+    groupId = "application-service-group"
+)
+public void consumeOrder(OrderEvent event) {
+
+    System.out.println(event);
+}
+
+@KafkaListener(
+    topics = "payments-topic",
+    groupId = "application-service-group"
+)
+public void consumePayment(PaymentEvent event) {
+
+    System.out.println(event);
+}
+```
+
+A consumer group can subscribe to multiple topics, and its consumers can be assigned partitions from all subscribed topics.
+
+---
+
+## 36. Adding a New Consumer to an Existing Consumer Group
+
+Suppose:
+
+```text
+Topic: orders-topic
+Partitions: 3
+
+Consumer Group: inventory-group
+
+Consumer 1 -> Partition 0
+Consumer 2 -> Partition 1
+Consumer 3 -> Partition 2
+```
+
+Now add Consumer 4 with the same group ID.
+
+Kafka detects the membership change and triggers a rebalance.
+
+However, since there are only three partitions, Consumer 4 will remain idle after assignment.
+
+If the topic has six partitions, the four consumers can share the six partitions.
+
+Example:
+
+```text
+Consumer 1 -> Partition 0, Partition 1
+Consumer 2 -> Partition 2, Partition 3
+Consumer 3 -> Partition 4
+Consumer 4 -> Partition 5
+```
+
+The exact assignment depends on the configured partition assignment strategy.
+
+---
+
+## 37. Important Kafka Responsibilities
+
+| Component | Responsibility |
+|---|---|
+| Producer | Creates and publishes events |
+| Producer partitioner | Determines destination partition |
+| Broker / Partition Leader | Appends records and assigns offsets |
+| Follower | Replicates partition data |
+| Controller | Manages cluster metadata and leader elections |
+| Topic | Logical category of events |
+| Partition | Ordered log of events |
+| Consumer | Reads and processes events |
+| Consumer Group | Coordinates consumers and tracks progress |
+| Offset | Identifies a record's position within a partition |
+| Retention Policy | Determines how long records are retained |
+
+---
+
+## 38. Quick Interview Revision
+
+**1. Is a topic and an event the same?**
+
+No. A topic is a logical category; an event is the actual record stored in it.
+
+**2. Can multiple consumers consume the same partition?**
+
+Within the same consumer group, only one active consumer is assigned that partition at a time. Different groups can independently consume it.
+
+**3. Can Kafka delete an event after consumption?**
+
+Consumption does not delete events. Retention and cleanup policies determine deletion.
+
+**4. Where are consumer offsets stored?**
+
+In Kafka's internal `__consumer_offsets` topic.
+
+**5. Who assigns offsets?**
+
+The partition leader broker assigns offsets when records are appended.
+
+**6. Why is ordering guaranteed only within a partition?**
+
+Each partition is an independent ordered log. Kafka does not guarantee ordering across partitions.
+
+**7. How can we maintain ordering for an order?**
+
+Use the same order ID as the Kafka message key.
+
+**8. What happens when a consumer crashes?**
+
+Kafka triggers a rebalance and assigns its partitions to other consumers. Processing resumes from committed offsets.
+
+**9. What happens if consumers are more than partitions?**
+
+Some consumers remain idle within that consumer group.
+
+**10. Can multiple microservices consume the same topic?**
+
+Yes. Use different consumer groups.
+
+**11. Is Kafka push-based or pull-based?**
+
+Kafka uses a pull-based consumer model through polling.
+
+**12. Is Kafka a database?**
+
+No. It is a distributed event streaming platform that stores events in partition logs.
+
+**13. What is KRaft?**
+
+Kafka's built-in metadata management and coordination architecture based on the Raft consensus protocol.
+
+**14. What is the difference between leader and follower?**
+
+The leader handles normal partition reads and writes; followers replicate the leader's data.
+
+**15. What is consumer lag?**
+
+The difference between the latest available offset and the consumer group's committed progress, measured per partition.
+
+**16. What is a Dead Letter Topic?**
+
+A separate topic where events that cannot be processed successfully can be sent for investigation or later handling.
+
+**17. Can we consume an old event again?**
+
+Yes. We can reset a consumer group's offsets to an earlier position, provided the required records are still retained.
+
+**18. What happens when a new consumer group is added?**
+
+Kafka establishes the group and assigns partitions. Its starting position depends on its committed offsets and `auto.offset.reset` configuration.
+
+**19. What happens if the leader broker fails?**
+
+The controller can elect an eligible in-sync replica as the new leader.
+
+**20. What is replication factor 3?**
+
+Three replicas of a partition: one leader and two followers.
+
+---
+
+## 39. Most Important Concepts to Remember
+
+```text
+Kafka
+ |
+ |-- Cluster
+ |     |
+ |     |-- Brokers
+ |           |
+ |           |-- Topics
+ |                 |
+ |                 |-- Partitions
+ |                       |
+ |                       |-- Events
+ |                       |-- Offsets
+ |                       |-- Replicas
+ |
+ |-- Producer
+ |     |
+ |     |-- Publishes events
+ |     |-- Selects partition
+ |
+ |-- Consumer
+       |
+       |-- Polls events
+       |-- Processes events
+       |-- Commits offsets
+       |
+       |-- Consumer Group
+             |
+             |-- Multiple consumers
+             |-- Partition assignment
+             |-- Independent offsets
+```
+
+**Final understanding:**
+
+- Producer is responsible for publishing events.
+- Kafka broker stores events in partition logs.
+- Partition leader assigns offsets.
+- Replicas provide fault tolerance.
+- Consumer polls and processes events.
+- Consumer group manages partition assignments and consumption progress.
+- Different consumer groups can independently consume the same events.
+- Retention policy determines how long events remain in Kafka.
+- KRaft manages Kafka cluster metadata and coordination without requiring ZooKeeper.
