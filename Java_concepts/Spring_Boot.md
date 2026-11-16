@@ -3633,3 +3633,130 @@ Study the annotations in this order to understand the conditions behind them, ra
 10. Spring Security and testing annotations — authorization and verification.
 
 **Final interview tip:** For every annotation, prepare four things: its definition, why it is needed, when to use it, and what happens internally. Be ready to explain a real project example and at least one limitation or alternative.
+
+
+# Spring Boot Application Startup Flow – Internal Working
+
+When we run a Spring Boot application, the JVM first invokes the `main()` method. Inside the main method, we call `SpringApplication.run()`, which bootstraps the entire Spring Boot application.
+
+Initially, Spring Boot initializes the startup process and prepares the application environment by loading application properties, environment variables, command-line arguments, and other property sources.
+
+Next, it determines the application type, whether it is Servlet, Reactive, or Non-Web, and creates the appropriate `ApplicationContext`, which acts as the Spring IoC container.
+
+After that, Spring Boot refreshes the `ApplicationContext`. During this process, Spring processes the `@SpringBootApplication` annotation and its three major annotations:
+
+### 1. `@SpringBootConfiguration`
+
+- Identifies the main application class as a configuration class.
+- It is a specialized version of Spring's `@Configuration` annotation.
+- It allows us to define beans using `@Bean` methods.
+
+### 2. `@EnableAutoConfiguration`
+
+- Automatically configures the required beans based on the dependencies available in the classpath and applicable conditions.
+- For example, when we add `spring-boot-starter-web`, Spring Boot detects the web dependencies and configures the required Spring MVC and embedded server infrastructure.
+- It uses conditional annotations to decide which configurations should be applied.
+- If we provide our own configuration, Spring Boot can back off from certain default configurations.
+
+### 3. `@ComponentScan`
+
+- Scans the application package and its subpackages to identify Spring-managed components.
+- It identifies classes annotated with `@Component`, `@Service`, `@Repository`, and `@Controller`.
+- It registers their bean definitions in the Spring container.
+
+By default, component scanning starts from the package containing the main application class and scans its subpackages.
+
+### Bean Creation and Initialization
+
+Once the component scanning and auto-configuration processes register the bean definitions, Spring creates the required beans, injects their dependencies, and executes their initialization logic.
+
+Spring also registers and applies BeanPostProcessors, which can customize beans during their initialization lifecycle.
+
+### Embedded Server Startup
+
+For a web application, Spring Boot starts the embedded Tomcat server as part of the ApplicationContext refresh process.
+
+The application can now receive HTTP requests once it is ready.
+
+### Final Startup Steps
+
+After the ApplicationContext refresh is completed:
+
+1. Spring Boot publishes the `ApplicationStartedEvent`.
+2. It executes `CommandLineRunner` and `ApplicationRunner` beans.
+3. It publishes the `ApplicationReadyEvent`.
+
+At this point, the Spring Boot application is considered ready to accept incoming requests.
+
+---
+
+## Complete Startup Flow
+
+```text
+JVM invokes main()
+        |
+        v
+SpringApplication.run()
+        |
+        v
+Initialize startup process
+        |
+        v
+Prepare Application Environment
+(Properties, Profiles, Environment Variables)
+        |
+        v
+Determine Application Type
+(Servlet / Reactive / Non-Web)
+        |
+        v
+Create ApplicationContext
+(Spring IoC Container)
+        |
+        v
+Refresh ApplicationContext
+        |
+        v
+Process @SpringBootApplication
+        |
+        +-----------------------------+
+        |              |              |
+        v              v              v
+@SpringBoot       @EnableAuto      @Component
+Configuration     Configuration    Scan
+        |              |              |
+        v              v              v
+Main config      Configure beans   Discover application
+class            based on classpath components
+                 and conditions
+        |              |              |
+        +--------------+--------------+
+                       |
+                       v
+              Register Bean Definitions
+                       |
+                       v
+              Create and Initialize Beans
+                       |
+                       v
+              Start Embedded Tomcat
+                       |
+                       v
+              Execute Application Runners
+                       |
+                       v
+              ApplicationReadyEvent
+                       |
+                       v
+                APPLICATION READY
+```
+
+## Interview Summary
+
+When explaining this in an interview, remember:
+
+- `@SpringBootConfiguration` – identifies the configuration class.
+- `@EnableAutoConfiguration` – configures infrastructure based on dependencies and conditions.
+- `@ComponentScan` – discovers our application components.
+
+Together, these three annotations simplify application configuration and bootstrap the Spring Boot application.
