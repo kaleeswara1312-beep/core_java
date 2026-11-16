@@ -3760,3 +3760,126 @@ When explaining this in an interview, remember:
 - `@ComponentScan` – discovers our application components.
 
 Together, these three annotations simplify application configuration and bootstrap the Spring Boot application.
+
+# Spring Bean Lifecycle
+
+## What is Bean Lifecycle?
+
+Bean lifecycle describes how Spring creates, initializes, manages, and destroys a bean inside the Spring IoC Container.
+
+When we start a Spring Boot application, Spring manages the bean lifecycle automatically.
+
+## Bean Lifecycle Steps
+
+### 1. Bean Definition Registration
+- Spring scans the application classes and identifies beans using annotations such as `@Component`, `@Service`, `@Repository`, `@Controller`, and `@Bean`.
+- It registers their bean definitions (metadata) inside the IoC Container.
+- At this stage, Spring knows how to create the bean, but the actual object may not have been created yet.
+
+### 2. Bean Object Creation (Instantiation)
+- Spring creates the actual bean object by calling the class constructor.
+- The object is managed by the Spring IoC Container.
+
+### 3. Dependency Injection
+- Spring injects the required dependencies into the bean.
+- Dependencies can be injected through constructor injection, setter injection, or field injection.
+
+### 4. Bean Initialization
+- After dependency injection, Spring performs initialization.
+- It calls initialization callbacks such as:
+  - `@PostConstruct`
+  - `InitializingBean.afterPropertiesSet()`
+  - Custom `initMethod`
+
+### 5. Bean Ready to Use
+- After initialization is completed, the bean is ready to be used by the application.
+- Other components can use the bean through dependency injection.
+
+### 6. Bean Destruction
+- When the Spring application context shuts down gracefully, Spring performs bean cleanup.
+- It calls destruction callbacks such as:
+  - `@PreDestroy`
+  - `DisposableBean.destroy()`
+  - Custom `destroyMethod`
+
+## Bean Lifecycle Flow
+
+```text
+Spring Boot Application Starts
+             |
+             v
+Bean Definition Registration
+             |
+             v
+Bean Object Creation
+       (Constructor)
+             |
+             v
+Dependency Injection
+             |
+             v
+Bean Initialization
+       (@PostConstruct)
+             |
+             v
+      Bean Ready to Use
+             |
+             v
+Application Shuts Down
+             |
+             v
+Bean Destruction
+        (@PreDestroy)
+```
+
+## Simple Example
+
+```java
+@Component
+public class OrderService {
+
+    public OrderService() {
+        System.out.println("Bean Created");
+    }
+
+    @PostConstruct
+    public void init() {
+        System.out.println("Bean Initialized");
+    }
+
+    public void placeOrder() {
+        System.out.println("Order Placed");
+    }
+
+    @PreDestroy
+    public void destroy() {
+        System.out.println("Bean Destroyed");
+    }
+}
+```
+
+## Interview Answer
+
+Bean lifecycle describes how Spring manages a bean from creation until destruction.
+
+When the Spring Boot application starts, Spring first registers the bean definitions inside the IoC Container. Then it creates the actual bean objects using their constructors and injects the required dependencies.
+
+After dependency injection, Spring initializes the bean by calling methods such as `@PostConstruct`. Once initialization is completed, the bean is ready to be used by the application.
+
+Finally, when the application shuts down gracefully, Spring calls `@PreDestroy` to perform cleanup operations.
+
+**In short:**
+
+Create → Inject → Initialize → Use → Destroy
+
+## Important Points
+
+- Bean definition registration happens before actual bean creation.
+- Dependency injection happens after instantiation and before initialization callbacks.
+- `@PostConstruct` executes during bean initialization.
+- `@PreDestroy` executes during bean destruction.
+- By default, singleton beans are created during application startup.
+- Lazy-initialized beans are created only when needed.
+- Spring does not automatically manage the destruction callbacks of prototype-scoped beans.
+
+**Remember:** This is the general lifecycle of a regular Spring-managed singleton bean.
