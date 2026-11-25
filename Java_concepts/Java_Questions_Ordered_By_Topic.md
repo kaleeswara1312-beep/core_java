@@ -651,3 +651,71 @@ This is a compact, topic-wise question bank from the big file. No long answers �
 12. Behavioral and design discussion
 
 This is the cleanest way to revise without reading the entire big file every time.
+
+
+API suddenly becomes slow
+2. Duplicate payment after client retry
+3. @Transactional doesn't roll back
+4. Hibernate N+1 query problem
+5. One Spring Boot instance suddenly runs out of memory
+6. Two users update the same database row
+7. Application works locally but times out in production
+8. Third-party API becomes slow
+9. @Async is not working asynchronously
+10. Choosing the right caching strategy
+11.  Kafka delivers duplicate messages
+12.  API needs to return 100,000+ records
+13.  JVM CPU reaches 95%
+14. Circular dependency in Spring Boot
+15.  Zero-downtime deployment
+ 
+Spring Boot & Deployment
+ 
+16. Circular Dependency
+How to identify and properly refactor circular dependencies instead of simply hiding them with @Lazy.
+ 
+17. Zero-Downtime Deployment
+Rolling deployments, blue-green deployments, health checks, traffic routing, and graceful shutdown.
+ 
+🔹 SQL & PostgreSQL Interview Scenarios
+ 
+18. Second-Highest DISTINCT Salary
+Using DENSE_RANK() to correctly handle duplicate salaries.
+ 
+19. Find Duplicate Customers
+Using GROUP BY and HAVING to identify duplicate records.
+ 
+20. Salary Above Department Average
+Using SQL window functions and PARTITION BY.
+ 
+21. Slow Query After Database Growth
+Why you should investigate EXPLAIN ANALYZE and query execution plans before simply adding an index.
+ 
+22. Delete Duplicates but Keep the Oldest
+Using ROW_NUMBER() and PARTITION BY.
+ 
+23. Customers With No Orders
+Using NOT EXISTS to clearly express the business condition.
+ 
+24. Latest Order for Every Customer
+Using ROW_NUMBER() and PostgreSQL's DISTINCT ON.
+ 
+🔹 Large-Scale Data & Performance
+ 
+25. OFFSET Pagination Becomes Slow
+Why large offsets become expensive and how keyset pagination can improve performance.
+ 
+26. Updating 20 Million Rows
+Understanding how a huge transaction can cause locks, WAL growth, replication lag, and expensive rollback.
+ 
+27. Concurrent Transactions Show Inconsistent Results
+Understanding transaction boundaries, isolation levels, locks, optimistic locking, and deadlocks.
+ 
+28. PostgreSQL Table Has 500 Million Rows
+A complete performance strategy involving execution plans, indexes, partitioning, caching, archival, and read replicas.
+ 
+29. Database CPU Is 90%
+How to investigate expensive SQL, table scans, joins, sorting, bad execution plans, N+1 queries, and query frequency.
+ 
+30. Archive Billions of Old Records
+Designing a scalable archival architecture for large historical datasets.
