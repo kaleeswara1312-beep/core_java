@@ -1037,3 +1037,920 @@ Metaspace
 > Date-Time API introduced immutable and thread-safe date/time classes.
 > In Java 8, HotSpot also replaced PermGen with Metaspace for storing
 > class metadata.
+
+# Java 11, 17 and 21 Features – Interview Reference
+
+---
+
+# Java 11 Features
+
+## 1. String API Enhancements
+
+Java 11 introduced several useful String methods to simplify string handling.
+
+### `isBlank()`
+
+Checks whether a string is empty or contains only whitespace.
+
+```java
+String str1 = "";
+String str2 = "   ";
+String str3 = "Java";
+
+System.out.println(str1.isBlank()); // true
+System.out.println(str2.isBlank()); // true
+System.out.println(str3.isBlank()); // false
+```
+
+**Difference between `isEmpty()` and `isBlank()`:**
+
+- `isEmpty()` checks whether the length is zero.
+- `isBlank()` checks whether the string is empty or contains only whitespace.
+
+### `strip()`
+
+Removes leading and trailing whitespace based on Unicode whitespace rules.
+
+```java
+String str = "   Java   ";
+
+System.out.println(str.strip()); // Java
+```
+
+### `stripLeading()`
+
+Removes whitespace from the beginning of the string.
+
+```java
+String str = "   Java   ";
+
+System.out.println(str.stripLeading()); // Java   
+```
+
+### `stripTrailing()`
+
+Removes whitespace from the end of the string.
+
+```java
+String str = "   Java   ";
+
+System.out.println(str.stripTrailing()); //    Java
+```
+
+### `repeat()`
+
+Repeats a string a specified number of times.
+
+```java
+String str = "Java ";
+
+System.out.println(str.repeat(3)); // Java Java Java
+```
+
+### `lines()`
+
+Returns a stream of lines from a string separated by line terminators.
+
+```java
+String str = "Java\nSpring\nKafka";
+
+str.lines().forEach(System.out::println);
+```
+
+Output:
+
+```text
+Java
+Spring
+Kafka
+```
+
+**Interview point:** These methods reduce the need for custom logic to handle whitespace, repeating strings, or processing multi-line strings.
+
+---
+
+## 2. New HTTP Client API
+
+Java 11 introduced a standardized HTTP Client API through `java.net.http`.
+
+Previously, developers commonly used `HttpURLConnection` or third-party libraries.
+
+The new API supports:
+
+- HTTP/1.1 and HTTP/2
+- Synchronous requests
+- Asynchronous requests
+- GET, POST, PUT, DELETE and other HTTP methods
+- Request and response handling
+
+### Example – GET Request
+
+```java
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+
+public class HttpExample {
+
+    public static void main(String[] args) throws Exception {
+
+        HttpClient client = HttpClient.newHttpClient();
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("https://jsonplaceholder.typicode.com/posts/1"))
+                .GET()
+                .build();
+
+        HttpResponse<String> response = client.send(
+                request,
+                HttpResponse.BodyHandlers.ofString()
+        );
+
+        System.out.println(response.statusCode());
+        System.out.println(response.body());
+    }
+}
+```
+
+### Important classes
+
+| Class | Purpose |
+|---|---|
+| `HttpClient` | Sends HTTP requests |
+| `HttpRequest` | Represents an HTTP request |
+| `HttpResponse` | Represents an HTTP response |
+| `HttpResponse.BodyHandlers` | Defines how response bodies are handled |
+
+### Asynchronous request
+
+```java
+HttpClient client = HttpClient.newHttpClient();
+
+HttpRequest request = HttpRequest.newBuilder()
+        .uri(URI.create("https://jsonplaceholder.typicode.com/posts/1"))
+        .GET()
+        .build();
+
+client.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+      .thenApply(HttpResponse::body)
+      .thenAccept(System.out::println);
+```
+
+`sendAsync()` returns a `CompletableFuture`, allowing the request to be processed asynchronously.
+
+**Interview point:** Java 11's HTTP Client API provides a modern, built-in alternative to older HTTP APIs and supports asynchronous programming using `CompletableFuture`.
+
+---
+
+## 3. Local-Variable Syntax for Lambda Parameters (`var`)
+
+Java 11 allows `var` to be used for lambda parameters.
+
+It was introduced to allow annotations on lambda parameters and to provide consistent syntax.
+
+### Before
+
+```java
+list.forEach((name) -> System.out.println(name));
+```
+
+### Using `var`
+
+```java
+list.forEach((var name) -> System.out.println(name));
+```
+
+### Example with annotations
+
+```java
+list.forEach((@Deprecated var name) -> System.out.println(name));
+```
+
+**Important:**
+
+- `var` does not mean dynamic typing.
+- The type is still determined by the compiler.
+- You must use `var` for all lambda parameters or none of them.
+
+Invalid:
+
+```java
+list.forEach((var name) -> System.out.println(name)); // Valid
+
+// Invalid mixed syntax:
+// list.forEach((var name, age) -> {});
+```
+
+**Interview point:** Lambda parameter `var` was introduced in Java 11, allowing annotations and consistent parameter declarations.
+
+---
+
+## 4. Files API Enhancements
+
+Java 11 introduced convenient methods in `java.nio.file.Files` for reading and writing entire files.
+
+### `readString()`
+
+Reads the entire file content into a String.
+
+```java
+import java.nio.file.Files;
+import java.nio.file.Path;
+
+public class FileExample {
+
+    public static void main(String[] args) throws Exception {
+
+        Path path = Path.of("data.txt");
+
+        String content = Files.readString(path);
+
+        System.out.println(content);
+    }
+}
+```
+
+### `writeString()`
+
+Writes a string directly into a file.
+
+```java
+import java.nio.file.Files;
+import java.nio.file.Path;
+
+public class FileExample {
+
+    public static void main(String[] args) throws Exception {
+
+        Path path = Path.of("data.txt");
+
+        Files.writeString(path, "Hello Java 11");
+
+        System.out.println("File written successfully");
+    }
+}
+```
+
+### Important points
+
+- `readString()` reads the entire file into memory.
+- `writeString()` writes content to a file.
+- UTF-8 is the default charset for these methods.
+- These methods are useful for smaller files.
+- For large files, streaming-based approaches are generally better.
+
+**Interview point:** Java 11 simplified file operations by providing direct String-based reading and writing methods.
+
+---
+
+## 5. Running Java Source Files Directly
+
+Java 11 allows us to run a Java source file directly without explicitly compiling it using `javac` first.
+
+### Traditionally
+
+```bash
+javac Hello.java
+java Hello
+```
+
+### Java 11
+
+```bash
+java Hello.java
+```
+
+Example:
+
+```java
+public class Hello {
+
+    public static void main(String[] args) {
+        System.out.println("Hello Java 11");
+    }
+}
+```
+
+Run:
+
+```bash
+java Hello.java
+```
+
+The Java launcher compiles and executes the source file in one step.
+
+**Interview point:** This feature is useful for scripting, learning, quick experiments and small programs.
+
+It does not eliminate compilation; the Java launcher handles compilation internally.
+
+---
+
+# Java 17 Features
+
+> Note: Some features listed below were introduced before Java 17 but are part of the modern Java feature set. Java 17 is a useful milestone because it is an LTS release.
+
+---
+
+## 6. Sealed Classes
+
+Sealed classes restrict which classes or interfaces are allowed to extend or implement them.
+
+Before sealed classes, any class could extend a non-final class unless other restrictions were applied.
+
+Sealed classes allow us to control the inheritance hierarchy.
+
+### Example
+
+```java
+public sealed class Vehicle
+        permits Car, Bike {
+}
+```
+
+Only `Car` and `Bike` are allowed to extend `Vehicle`.
+
+```java
+public final class Car extends Vehicle {
+}
+```
+
+```java
+public final class Bike extends Vehicle {
+}
+```
+
+### Important rules
+
+A permitted subclass must declare one of the following:
+
+- `final` – cannot be extended further.
+- `sealed` – further inheritance is restricted.
+- `non-sealed` – inheritance restrictions are removed for that subclass.
+
+### Example
+
+```java
+public sealed class Vehicle
+        permits Car, Bike {
+}
+```
+
+```java
+public final class Car extends Vehicle {
+}
+```
+
+```java
+public sealed class Bike extends Vehicle
+        permits SportsBike {
+}
+```
+
+```java
+public final class SportsBike extends Bike {
+}
+```
+
+### Why do we need sealed classes?
+
+- Restrict inheritance.
+- Control the class hierarchy.
+- Improve maintainability.
+- Support more predictable pattern matching.
+
+**Interview point:** Sealed classes give developers control over which classes can extend a parent class.
+
+<caption>Sealed classes were finalized in Java 17.</caption>
+
+---
+
+## 7. Pattern Matching for Switch
+
+Pattern matching for `switch` allows us to check the type of an object and bind it to a variable directly inside a switch case.
+
+<caption>Pattern matching for switch was a preview feature in Java 17. It became a standard feature in Java 21.</caption>
+
+### Before
+
+```java
+Object obj = "Java";
+
+if (obj instanceof String) {
+    String str = (String) obj;
+    System.out.println(str.length());
+}
+```
+
+### Pattern matching in switch
+
+```java
+Object obj = "Java";
+
+switch (obj) {
+
+    case String str ->
+            System.out.println(str.length());
+
+    case Integer number ->
+            System.out.println(number);
+
+    default ->
+            System.out.println("Unknown type");
+}
+```
+
+Instead of manually checking the type and casting, the switch pattern directly provides a variable of the matched type.
+
+### Why do we need it?
+
+- Avoid unnecessary casting.
+- Simplify type-based logic.
+- Improve readability.
+- Make switch statements more expressive.
+
+**Interview point:** Pattern matching for switch combines type checking, variable binding and switch logic.
+
+---
+
+## 8. Records
+
+Records are used to create simple data carrier classes.
+
+They reduce boilerplate code such as:
+
+- Constructors
+- Getters
+- `equals()`
+- `hashCode()`
+- `toString()`
+
+### Traditional class
+
+```java
+public class Employee {
+
+    private final int id;
+    private final String name;
+
+    public Employee(int id, String name) {
+        this.id = id;
+        this.name = name;
+    }
+
+    public int getId() {
+        return id;
+    }
+
+    public String getName() {
+        return name;
+    }
+}
+```
+
+### Using Record
+
+```java
+public record Employee(int id, String name) {
+}
+```
+
+Usage:
+
+```java
+Employee emp = new Employee(101, "Kali");
+
+System.out.println(emp.id());
+System.out.println(emp.name());
+System.out.println(emp);
+```
+
+### Important points
+
+- Records are implicitly final.
+- Record components are private and final.
+- Accessors are generated.
+- Constructor is generated.
+- `equals()`, `hashCode()` and `toString()` are generated.
+- Records are shallowly immutable, not necessarily deeply immutable.
+
+### Why do we use Records?
+
+- DTOs
+- API request and response models
+- Data transfer
+- Immutable data representation
+
+**Interview point:** Records reduce boilerplate when the primary purpose of a class is to hold data.
+
+<caption>Records became a standard feature in Java 16.</caption>
+
+---
+
+## 9. Text Blocks
+
+Text blocks allow us to write multi-line strings more easily.
+
+They are especially useful for SQL, JSON and HTML.
+
+### Before
+
+```java
+String json = "{\n" +
+              "  \"name\": \"Java\",\n" +
+              "  \"version\": 17\n" +
+              "}";
+```
+
+### Using Text Blocks
+
+```java
+String json = """
+        {
+            "name": "Java",
+            "version": 17
+        }
+        """;
+```
+
+### SQL example
+
+```java
+String sql = """
+        SELECT *
+        FROM employees
+        WHERE department = 'IT'
+        """;
+```
+
+### Why do we need it?
+
+- Easier multi-line strings.
+- Better readability.
+- Less escaping.
+- Convenient for SQL, JSON and HTML.
+
+**Interview point:** Text blocks simplify the representation of multi-line string literals.
+
+<caption>Text blocks became a standard feature in Java 15.</caption>
+
+---
+
+## 10. Enhanced `instanceof`
+
+Enhanced `instanceof`, also called pattern matching for `instanceof`, allows us to check a type and declare a variable in one step.
+
+### Before
+
+```java
+Object obj = "Java";
+
+if (obj instanceof String) {
+
+    String str = (String) obj;
+
+    System.out.println(str.length());
+}
+```
+
+### After
+
+```java
+Object obj = "Java";
+
+if (obj instanceof String str) {
+
+    System.out.println(str.length());
+}
+```
+
+The variable `str` is automatically available when the type check succeeds.
+
+### Example
+
+```java
+public static void printValue(Object obj) {
+
+    if (obj instanceof Integer number) {
+        System.out.println(number * 2);
+    }
+    else if (obj instanceof String str) {
+        System.out.println(str.toUpperCase());
+    }
+}
+```
+
+### Why do we need it?
+
+- Avoid manual casting.
+- Reduce boilerplate.
+- Improve readability.
+- Make type checking easier.
+
+**Interview point:** Pattern matching for `instanceof` combines the type check and casting into a single expression.
+
+<caption>It became a standard feature in Java 16.</caption>
+
+---
+
+## 11. New Random Generator API
+
+Java 17 introduced a new random number generator API through `java.util.random`.
+
+It provides a common abstraction for different random number generator algorithms.
+
+### Traditional approach
+
+```java
+import java.util.Random;
+
+Random random = new Random();
+
+int number = random.nextInt(100);
+
+System.out.println(number);
+```
+
+### New API
+
+```java
+import java.util.random.RandomGenerator;
+
+RandomGenerator generator = RandomGenerator.getDefault();
+
+int number = generator.nextInt(100);
+
+System.out.println(number);
+```
+
+### Important interfaces
+
+- `RandomGenerator`
+- `RandomGeneratorFactory`
+
+### Why do we need it?
+
+- Common interface for different random algorithms.
+- More flexible random generation.
+- Access to different generator implementations.
+- Useful for simulation, testing and random data generation.
+
+**Interview point:** The new Random Generator API provides a unified abstraction for random number generation and supports multiple algorithms.
+
+<caption>The broader Random Generator API was introduced in Java 17.</caption>
+
+---
+
+# Java 21 Features
+
+## 12. Sequenced Collections
+
+Sequenced Collections were introduced in Java 21 to provide a common API for collections that maintain a defined encounter order.
+
+Examples include:
+
+- `ArrayList`
+- `LinkedList`
+- `LinkedHashSet`
+- `TreeSet`
+- `LinkedHashMap`
+- `TreeMap`
+
+### Problem before Java 21
+
+Different collection types used different methods to access their first and last elements.
+
+For example:
+
+```java
+List<Integer> list = new ArrayList<>();
+
+list.add(10);
+list.add(20);
+list.add(30);
+
+System.out.println(list.get(0)); // First element
+System.out.println(list.get(list.size() - 1)); // Last element
+```
+
+For a Deque, we could use:
+
+```java
+deque.getFirst();
+deque.getLast();
+```
+
+The API was inconsistent across collection types.
+
+### Solution – Sequenced Collections
+
+Java 21 introduced the following interfaces:
+
+- `SequencedCollection`
+- `SequencedSet`
+- `SequencedMap`
+
+These interfaces provide a consistent API for accessing and manipulating elements at both ends of an ordered collection.
+
+### Common methods
+
+| Method | Purpose |
+|---|---|
+| `getFirst()` | Returns the first element |
+| `getLast()` | Returns the last element |
+| `addFirst()` | Adds an element at the beginning |
+| `addLast()` | Adds an element at the end |
+| `removeFirst()` | Removes the first element |
+| `removeLast()` | Removes the last element |
+| `reversed()` | Returns a reverse-ordered view |
+
+### Example – List
+
+```java
+List<Integer> list = new ArrayList<>();
+
+list.add(10);
+list.add(20);
+list.add(30);
+
+System.out.println(list.getFirst()); // 10
+System.out.println(list.getLast());  // 30
+
+list.addFirst(5);
+list.addLast(40);
+
+System.out.println(list); // [5, 10, 20, 30, 40]
+```
+
+### Example – Reversed view
+
+```java
+List<Integer> list = new ArrayList<>();
+
+list.add(10);
+list.add(20);
+list.add(30);
+
+System.out.println(list.reversed());
+```
+
+Output:
+
+```text
+[30, 20, 10]
+```
+
+`reversed()` provides a reverse-ordered view rather than necessarily creating an independent copy.
+
+### Why do we need Sequenced Collections?
+
+- Consistent API across ordered collections.
+- Easy access to first and last elements.
+- Easy insertion and removal at either end.
+- Easier reverse-order processing.
+- Better consistency across collection implementations.
+
+**Interview point:** Java 21 introduced Sequenced Collections to standardize operations on collections that maintain a defined encounter order.
+
+---
+
+## 13. Virtual Threads
+
+Virtual threads were introduced to improve scalability when applications handle a large number of concurrent tasks.
+
+### Traditional platform threads
+
+Traditionally, Java threads are mapped to operating-system threads.
+
+Creating and managing a large number of platform threads can consume considerable resources.
+
+For example:
+
+```java
+Thread thread = new Thread(() -> {
+    System.out.println("Task executed");
+});
+
+thread.start();
+```
+
+When applications create thousands of threads, resource usage and thread management can become challenging.
+
+### What are Virtual Threads?
+
+Virtual threads are lightweight threads managed by the JVM.
+
+They are scheduled onto platform threads, which act as carrier threads.
+
+When a virtual thread performs a supported blocking operation, it can often unmount from its carrier thread, allowing the carrier thread to execute another virtual thread.
+
+This improves scalability for applications that handle many concurrent, mostly blocking tasks.
+
+### Example – Platform thread
+
+```java
+Thread thread = new Thread(() -> {
+    System.out.println("Platform thread");
+});
+
+thread.start();
+```
+
+### Example – Virtual thread
+
+```java
+Thread thread = Thread.startVirtualThread(() -> {
+    System.out.println("Virtual thread");
+});
+```
+
+### Example – Using ExecutorService
+
+```java
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+public class VirtualThreadExample {
+
+    public static void main(String[] args) {
+
+        try (ExecutorService executor =
+                     Executors.newVirtualThreadPerTaskExecutor()) {
+
+            for (int i = 0; i < 1000; i++) {
+
+                executor.submit(() -> {
+                    System.out.println(Thread.currentThread());
+                });
+            }
+        }
+    }
+}
+```
+
+### Platform threads vs Virtual threads
+
+| Platform Threads | Virtual Threads |
+|---|---|
+| Generally more resource-intensive | Lightweight |
+| Typically tied more closely to OS thread resources | Managed and scheduled by JVM |
+| Suitable for CPU-intensive work and general threading | Particularly useful for high-concurrency, blocking I/O workloads |
+| Creating very large numbers can be costly | Can support very large numbers of concurrent tasks |
+
+### Why do we need Virtual Threads?
+
+- Handle many concurrent requests.
+- Improve scalability for blocking I/O operations.
+- Reduce the cost of thread creation.
+- Simplify concurrent programming.
+- Reduce the need for thread pooling for certain I/O-bound workloads.
+
+### Important interview points
+
+- Virtual threads are not faster for CPU-intensive tasks.
+- They improve scalability, not necessarily execution speed.
+- They are useful for I/O-intensive workloads.
+- Virtual threads are managed by the JVM.
+- They are not a replacement for asynchronous APIs in every situation.
+- They should generally not be pooled like platform threads.
+- Blocking operations may allow a virtual thread to unmount, but not every blocking operation guarantees unmounting.
+
+**Interview point:** Virtual threads allow Java applications to handle a large number of concurrent tasks efficiently by using lightweight JVM-managed threads, especially for blocking I/O workloads.
+
+<caption>Virtual threads became a standard feature in Java 21.</caption>
+
+---
+
+# Quick Interview Revision
+
+| Feature | Java Version | Main Purpose |
+|---|---|---|
+| `isBlank()` | Java 11 | Checks empty or whitespace-only strings |
+| `strip()` | Java 11 | Removes leading and trailing Unicode whitespace |
+| `stripLeading()` | Java 11 | Removes leading whitespace |
+| `stripTrailing()` | Java 11 | Removes trailing whitespace |
+| `repeat()` | Java 11 | Repeats a string |
+| `lines()` | Java 11 | Returns a stream of lines |
+| HTTP Client API | Java 11 | Modern HTTP communication |
+| `var` in lambda parameters | Java 11 | Consistent lambda parameter syntax and annotations |
+| `Files.readString()` | Java 11 | Reads a file into a String |
+| `Files.writeString()` | Java 11 | Writes a String to a file |
+| Single-file execution | Java 11 | Runs source files directly |
+| Text Blocks | Java 15 | Multi-line string literals |
+| Enhanced `instanceof` | Java 16 | Pattern matching for `instanceof` |
+| Records | Java 16 | Simplified data carrier classes |
+| Sealed Classes | Java 17 | Restricts inheritance |
+| Random Generator API | Java 17 | Unified random generator abstraction |
+| Pattern Matching for switch | Java 21 (standard) | Type-based switch patterns |
+| Sequenced Collections | Java 21 | Uniform ordered collection operations |
+| Virtual Threads | Java 21 | Lightweight concurrency |
+
+---
+
+# Java Versions to Remember for Interviews
+
+- **Java 8:** Lambda, Stream API, Optional, functional interfaces, Date and Time API.
+- **Java 11:** String enhancements, HTTP Client API, Files API enhancements, single-file execution.
+- **Java 17:** Sealed classes (and the LTS milestone; several other features listed here became standard earlier).
+- **Java 21:** Sequenced Collections, Virtual Threads, Pattern Matching for switch (standard).
+
