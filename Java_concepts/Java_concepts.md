@@ -6,6 +6,508 @@
 
 ---
 
+# OOP (Object-Oriented Programming) – 4 Pillars of Java
+
+OOP (Object-Oriented Programming) is a programming approach where we organize our application around objects and classes.
+
+Java has four main pillars of OOP:
+
+1. Inheritance
+2. Abstraction
+3. Encapsulation
+4. Polymorphism
+
+---
+
+# 1. Inheritance
+
+## What is Inheritance?
+
+Inheritance allows a child class to acquire properties and methods from a parent class.
+
+In Java, we achieve inheritance using the `extends` keyword.
+
+### Why do we need Inheritance?
+
+- Code reusability.
+- Avoid duplicate code.
+- Establish a relationship between classes.
+- Allow child classes to extend or customize parent behavior.
+
+### Example
+
+Imagine we have a common `Vehicle` class. Both `Car` and `Bike` can reuse its common behavior.
+
+```java
+class Vehicle {
+
+    public void start() {
+        System.out.println("Vehicle started");
+    }
+}
+
+class Car extends Vehicle {
+
+    public void drive() {
+        System.out.println("Car is driving");
+    }
+}
+
+class Bike extends Vehicle {
+
+    public void ride() {
+        System.out.println("Bike is riding");
+    }
+}
+
+public class Main {
+
+    public static void main(String[] args) {
+
+        Car car = new Car();
+        car.start();  // Inherited method
+        car.drive();
+
+        Bike bike = new Bike();
+        bike.start(); // Inherited method
+        bike.ride();
+    }
+}
+```
+
+### Output
+
+```text
+Vehicle started
+Car is driving
+Vehicle started
+Bike is riding
+```
+
+Both `Car` and `Bike` reuse the `start()` method from `Vehicle`.
+
+### Types of Inheritance in Java
+
+- Single inheritance
+- Multilevel inheritance
+- Hierarchical inheritance
+
+Java does not support multiple inheritance through classes, but it supports multiple inheritance of type through interfaces.
+
+### Interview Answer
+
+Inheritance allows a child class to reuse and extend the properties and behavior of a parent class using `extends`. It helps reduce code duplication and establishes an IS-A relationship.
+
+---
+
+# 2. Abstraction
+
+## What is Abstraction?
+
+Abstraction means hiding the implementation details and exposing only the required functionality to the user.
+
+The user knows what functionality is available but does not need to know how the internal implementation works.
+
+In Java, we achieve abstraction using:
+
+- Abstract classes
+- Interfaces
+
+### Real-world example
+
+When we use an ATM:
+
+- We enter the PIN.
+- We withdraw money.
+- We check the balance.
+
+We don't need to know how the ATM internally communicates with the bank or processes the transaction.
+
+The internal implementation is hidden, and the required functionality is exposed.
+
+### Example using an Interface
+
+```java
+interface Payment {
+
+    void pay(double amount);
+}
+
+class UpiPayment implements Payment {
+
+    @Override
+    public void pay(double amount) {
+        System.out.println("Paid using UPI: " + amount);
+    }
+}
+
+class CardPayment implements Payment {
+
+    @Override
+    public void pay(double amount) {
+        System.out.println("Paid using Card: " + amount);
+    }
+}
+
+public class Main {
+
+    public static void main(String[] args) {
+
+        Payment payment = new UpiPayment();
+
+        payment.pay(1000);
+    }
+}
+```
+
+### Output
+
+```text
+Paid using UPI: 1000.0
+```
+
+The caller interacts with the `Payment` interface without needing to know the internal implementation of UPI payment.
+
+### Why do we need Abstraction?
+
+- Hide implementation details.
+- Expose only necessary functionality.
+- Reduce dependency on implementation.
+- Improve maintainability.
+- Allow multiple implementations.
+
+### Interview Answer
+
+Abstraction hides the internal implementation and exposes only the required functionality. In Java, we achieve abstraction through interfaces and abstract classes.
+
+---
+
+# 3. Encapsulation
+
+## What is Encapsulation?
+
+Encapsulation means hiding the internal state of an object and controlling how that state can be accessed or modified.
+
+We generally achieve encapsulation by:
+
+- Declaring fields as `private`.
+- Exposing required functionality through public methods.
+- Applying validation or business rules inside methods.
+
+### Why do we need Encapsulation?
+
+Suppose we have a bank account balance.
+
+If the balance is publicly accessible, anyone can directly modify it.
+
+```java
+account.balance = -5000;
+```
+
+This may violate business rules.
+
+Instead, we encapsulate the balance and control how it changes.
+
+### Example
+
+```java
+class BankAccount {
+
+    private double balance;
+
+    public BankAccount(double balance) {
+        this.balance = balance;
+    }
+
+    public double getBalance() {
+        return balance;
+    }
+
+    public void deposit(double amount) {
+
+        if (amount > 0) {
+            balance += amount;
+        }
+    }
+
+    public void withdraw(double amount) {
+
+        if (amount > 0 && amount <= balance) {
+            balance -= amount;
+        }
+    }
+}
+
+public class Main {
+
+    public static void main(String[] args) {
+
+        BankAccount account = new BankAccount(10000);
+
+        account.deposit(2000);
+        account.withdraw(3000);
+
+        System.out.println(account.getBalance());
+    }
+}
+```
+
+### Output
+
+```text
+9000.0
+```
+
+### What is happening here?
+
+- `balance` is private, so it cannot be directly accessed from outside the class.
+- `deposit()` controls how money is added.
+- `withdraw()` controls how money is removed.
+- Validation ensures invalid operations are rejected.
+
+We are not exposing direct access to the internal state. Instead, we control the modification through business methods.
+
+### Interview Answer
+
+Encapsulation is the process of hiding an object's internal state and providing controlled access to it through methods. It helps protect data and enforce business rules.
+
+---
+
+# 4. Polymorphism
+
+## What is Polymorphism?
+
+Polymorphism means one name or interface can represent different behaviors depending on the context.
+
+In Java, polymorphism is mainly classified into two types:
+
+1. Compile-time polymorphism
+2. Runtime polymorphism
+
+---
+
+## 4.1 Compile-Time Polymorphism (Method Overloading)
+
+Method overloading means having multiple methods with the same name but different parameter lists within the same class.
+
+The compiler determines which method to invoke based on the arguments supplied.
+
+### Example
+
+```java
+class Calculator {
+
+    public int add(int a, int b) {
+        return a + b;
+    }
+
+    public int add(int a, int b, int c) {
+        return a + b + c;
+    }
+
+    public double add(double a, double b) {
+        return a + b;
+    }
+}
+
+public class Main {
+
+    public static void main(String[] args) {
+
+        Calculator calculator = new Calculator();
+
+        System.out.println(calculator.add(10, 20));
+        System.out.println(calculator.add(10, 20, 30));
+        System.out.println(calculator.add(10.5, 20.5));
+    }
+}
+```
+
+### Output
+
+```text
+30
+60
+31.0
+```
+
+### Why is it called Compile-Time Polymorphism?
+
+The compiler determines the appropriate method based on the method name and parameter types, count and applicable overload resolution rules.
+
+### Important point
+
+Changing only the return type is not sufficient to overload a method.
+
+Invalid:
+
+```java
+int add(int a, int b) {
+    return a + b;
+}
+
+// Invalid: same parameter list, different return type only
+// double add(int a, int b) {
+```
+
+---
+
+## 4.2 Runtime Polymorphism (Method Overriding)
+
+Method overriding happens when a child class provides its own implementation of a method inherited from its parent class.
+
+At runtime, the JVM determines which overridden implementation to invoke based on the actual object.
+
+### Example
+
+```java
+class Animal {
+
+    public void sound() {
+        System.out.println("Animal makes sound");
+    }
+}
+
+class Dog extends Animal {
+
+    @Override
+    public void sound() {
+        System.out.println("Dog barks");
+    }
+}
+
+class Cat extends Animal {
+
+    @Override
+    public void sound() {
+        System.out.println("Cat meows");
+    }
+}
+
+public class Main {
+
+    public static void main(String[] args) {
+
+        Animal animal;
+
+        animal = new Dog();
+        animal.sound();
+
+        animal = new Cat();
+        animal.sound();
+    }
+}
+```
+
+### Output
+
+```text
+Dog barks
+Cat meows
+```
+
+### What is happening here?
+
+```java
+Animal animal = new Dog();
+animal.sound();
+```
+
+- `Animal` is the reference type.
+- `Dog` is the actual object type.
+- `Dog` overrides the `sound()` method.
+- At runtime, the overridden `Dog` implementation is executed.
+
+Even though the reference is of type `Animal`, the actual object is `Dog`.
+
+This is runtime polymorphism.
+
+### Why do we need Runtime Polymorphism?
+
+- Flexible code.
+- Loose coupling.
+- Easier extensibility.
+- Support for different implementations through a common parent or interface.
+- Useful in real-world application design.
+
+### Interview Answer
+
+Runtime polymorphism is achieved through method overriding. When a parent reference points to a child object, the JVM invokes the overridden method based on the actual object's type at runtime.
+
+---
+
+# Real-World Example of Polymorphism in Spring Boot
+
+```java
+interface NotificationService {
+
+    void sendNotification(String message);
+}
+```
+
+```java
+class EmailNotificationService implements NotificationService {
+
+    @Override
+    public void sendNotification(String message) {
+        System.out.println("Email: " + message);
+    }
+}
+```
+
+```java
+class SmsNotificationService implements NotificationService {
+
+    @Override
+    public void sendNotification(String message) {
+        System.out.println("SMS: " + message);
+    }
+}
+```
+
+```java
+class NotificationController {
+
+    private final NotificationService notificationService;
+
+    public NotificationController(NotificationService notificationService) {
+        this.notificationService = notificationService;
+    }
+
+    public void notifyUser() {
+        notificationService.sendNotification("Welcome");
+    }
+}
+```
+
+In Spring Boot, we can inject different implementations of `NotificationService` depending on the configuration.
+
+The controller does not need to know whether the notification is sent through Email or SMS.
+
+It depends on the interface, not the implementation.
+
+This is a practical use of polymorphism and abstraction.
+
+---
+
+# Quick Interview Revision
+
+| Pillar | Meaning | Java Mechanism | Benefit |
+|---|---|---|---|
+| Inheritance | Reusing and extending parent behavior | `extends` | Code reuse |
+| Abstraction | Hiding implementation details | `interface`, `abstract` | Simplifies usage |
+| Encapsulation | Protecting internal state | `private`, controlled methods | Data protection and validation |
+| Polymorphism | Different behaviors through a common method/type | Overloading and overriding | Flexibility and extensibility |
+
+---
+
+# One-Line Interview Answers
+
+- **Inheritance:** Allows a child class to reuse and extend the properties and methods of a parent class.
+- **Abstraction:** Hides implementation details and exposes only necessary functionality.
+- **Encapsulation:** Protects an object's internal state by controlling access and modification.
+- **Polymorphism:** Allows the same method or interface to represent different behaviors depending on the context.
+
 ## 0. Interview Strategy
 
 For every topic, prepare at four levels:
